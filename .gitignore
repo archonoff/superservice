@@ -140,3 +140,4 @@ ENV/
 .ropeproject
 
 /.idea/
+/settings_local.py
