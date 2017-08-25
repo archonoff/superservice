@@ -76,7 +76,7 @@ def get_open_orders():
 
 def get_users(users_type=None):
     with connection_users.cursor() as cursor:
-        connection_orders.commit()      # Это помогло с проблемой необновляющихся запросов
+        connection_users.commit()      # Это помогло с проблемой необновляющихся запросов
         if users_type:
             if users_type not in ('executor', 'customer'):
                 return 'Error: Wrong users type'
