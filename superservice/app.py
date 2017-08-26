@@ -54,6 +54,7 @@ pool_users = loop.run_until_complete(aiomysql.create_pool(host=settings.MYSQL_HO
                                                           password=settings.MYSQL_PASSWORD,
                                                           db=settings.MYSQL_DB,
                                                           cursorclass=aiomysql.cursors.DictCursor,
+                                                          autocommit=True,
                                                           loop=loop,
                                                           maxsize=50,           # todo откуда взять эти параметры?
                                                           minsize=10))
