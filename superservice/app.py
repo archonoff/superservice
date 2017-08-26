@@ -61,6 +61,3 @@ setup_session(app, SimpleCookieStorage())
 app['pool_users'] = pool_users
 app['connection_users'] = connection_users
 app['connection_orders'] = connection_orders
-
-
-# web.run_app(app, host='localhost', port=8000)     # todo не нужно, если запускать гуникорном
