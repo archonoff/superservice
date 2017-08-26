@@ -26,8 +26,6 @@ connection_orders = pymysql.connect(host=settings.MYSQL_HOST,
                                     cursorclass=pymysql.cursors.DictCursor)
 
 
-
-
 # Настройка приложения
 
 # try:
@@ -55,8 +53,9 @@ pool_users = loop.run_until_complete(aiomysql.create_pool(host=settings.MYSQL_HO
                                                           user=settings.MYSQL_USER,
                                                           password=settings.MYSQL_PASSWORD,
                                                           db=settings.MYSQL_DB,
+                                                          cursorclass=aiomysql.cursors.DictCursor,
                                                           loop=loop,
-                                                          maxsize=50,
+                                                          maxsize=50,           # todo откуда взять эти параметры?
                                                           minsize=10))
 
 
