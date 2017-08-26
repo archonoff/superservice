@@ -1,10 +1,11 @@
 import hashlib
 import pymysql
+import os
 
 import settings
 
 from aiohttp import web
-from aiohttp.web import json_response, HTTPTemporaryRedirect
+from aiohttp.web import json_response, HTTPTemporaryRedirect, Response
 
 from aiohttp_session import SimpleCookieStorage
 from aiohttp_session import get_session, setup as setup_session
@@ -29,12 +30,20 @@ connection_orders = pymysql.connect(host=settings.MYSQL_HOST,
                                     cursorclass=pymysql.cursors.DictCursor)
 
 
-def error_response(error_message):
+def rest_response(code: str, message) -> Response:
     result_dict = {
-        'result': 'error',
-        'message': error_message,
+        'result': code,
+        'message': message,
     }
     return json_response(result_dict)
+
+
+def success_response(message):
+    return rest_response('success', message)
+
+
+def error_response(message):
+    return rest_response('error', message)
 
 
 # Функции работы с БД
@@ -52,7 +61,39 @@ def get_users(users_type=None):
     return users
 
 
-def get_open_orders():
+def create_user(name, user_type, username, password_hash):
+    # todo нужна проверка username, чтобы избежать инъекций
+    if user_type not in ('executor', 'customer'):
+        return 'Неверно указан user_type'
+    with connection_users.cursor() as cursor:
+        cursor.execute('SELECT * FROM users WHERE username="{}"'.format(username))
+        users = cursor.fetchall()
+        if users:
+            return 'Пользователь с таким именем уже зарегистрирован'
+
+        cursor.execute('INSERT INTO users (name, type, username, password) VALUES ("{}", "{}", "{}", "{}");'.format(name, user_type, username, password_hash))
+        connection_users.commit()
+
+
+async def login(request, username, password_hash) -> Response:
+    with connection_users.cursor() as cursor:
+        cursor.execute('SELECT * FROM users WHERE username="{}" and password="{}"'.format(username, password_hash))
+        users: list = cursor.fetchall()
+        users_len = len(users)
+        if users_len == 0:
+            return error_response('Неправильное имя пользователя или пароль')
+        elif users_len >= 2:
+            return error_response('Ошибка в базе данных: больше одного пользователя')
+        else:
+            user_id = users[0].get('id')
+
+            session = await get_session(request)
+            session['user_id'] = user_id
+            session['username'] = username
+            return HTTPTemporaryRedirect('/')   # todo rest
+
+
+def get_open_orders() -> list:
     with connection_orders.cursor() as cursor:
         connection_orders.commit()      # fixme Это помогло с проблемой необновляющихся запросов
         cursor.execute('SELECT * FROM orders WHERE fulfilled=0;')
@@ -62,32 +103,22 @@ def get_open_orders():
 
 # Хэндлеры
 
-async def index(request):
-    return HTTPTemporaryRedirect('/orders/')
+async def index(request) -> Response:
+    with open(os.path.join(settings.BASE_DIR, 'frontend', 'index.html'), 'r') as f:
+        html = f.read()
+    return web.Response(body=html, content_type='text/html', charset='utf-8')
 
 
-async def login(request, username, password_hash):
-    result, user_id, username = True, '112', 'sdf'      # todo проверить с данными из БД на совпадение
-
-    if result:
-        session = await get_session(request)
-        session['user_id'] = user_id
-        session['username'] = username
-        return HTTPTemporaryRedirect('/')
-    else:
-        return error_response('Неправильное имя пользователя или пароль')
-
-
-async def user_login(request):
+async def user_login(request) -> Response:
     data = await request.json()
     username = data.get('username')
     password = data.get('password')
     password_hash = hashlib.sha256(password.encode()).hexdigest()
 
-    return login(request, username, password_hash)
+    return await login(request, username, password_hash)
 
 
-async def register_user(request):
+async def register_user(request) -> Response:
     data = await request.json()
     user_type = data.get('user_type')
     name = data.get('name')
@@ -95,42 +126,35 @@ async def register_user(request):
     password = data.get('password')
     password_hash = hashlib.sha256(password.encode()).hexdigest()
 
-    # res = create_user(name=name, user_type=user_type, username=username, password=password_hash)
+    error = create_user(name=name, user_type=user_type, username=username, password_hash=password_hash)
     # todo обработка результатов регистрации
-    res = None
-    if res:
-        return json_response(res)
+    # todo тут имеет место дубликация запросов при создании пользователя и сразу за этим - логин
+    if error:
+        return error_response(error)
 
     # todo залогиниться под новым пользователем
-    return login(request, username, password_hash)
+    return await login(request, username, password_hash)
 
 
-async def orders_list(request):
+async def orders_list(request) -> Response:
     open_orders = get_open_orders()
     return json_response(open_orders)
 
 
-async def users_list(request):
+async def users_list(request) -> Response:
     users_type = request.query.get('users_type')
     users = get_users(users_type)
     return json_response(users)
-
-
-async def vue(request):
-    with open(settings.BASE_DIR + '/frontend/index.html', 'r') as f:
-        html = f.read()
-    return web.Response(body=html, content_type='text/html', charset='utf-8')
 
 
 # Настройка приложения
 
 app = web.Application()
 app.router.add_get('/', index)
-app.router.add_get('/vue/', vue)
-app.router.add_get('/orders/', orders_list)
-app.router.add_post('/users/', users_list)
-app.router.add_post('/users/register/', register_user)
-app.router.add_post('/users/login/', user_login)
+app.router.add_get('/api/orders/', orders_list)
+app.router.add_get('/api/users/', users_list)
+app.router.add_post('/api/users/register/', register_user)
+app.router.add_post('/api/users/login/', user_login)
 # app.router.add_get('/{name}', handle)
 
 setup_session(app, SimpleCookieStorage())
