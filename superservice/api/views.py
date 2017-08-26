@@ -1,13 +1,18 @@
 import hashlib
 import os
+try:
+    import ujson as json_lib
+except:
+    import json as json_lib
 
 from .. import settings
 
 from aiohttp import web
 from aiohttp.web import Response
 
-from .storage import login, create_user, get_open_orders, get_users
+from .storage import login_user, create_user, get_open_orders, get_users
 from ..utils import success_response, error_response
+from ..exceptions import ConnectionNotFound, WrongUserType, UsernameAlreadyExists
 
 
 # Хэндлеры
@@ -24,11 +29,11 @@ async def user_login(request) -> Response:
     password = data.get('password')
     password_hash = hashlib.sha256(password.encode()).hexdigest()
 
-    return await login(request.app.get('connection_users'), request, username, password_hash)
+    return await login_user(request.app.get('connection_users'), request, username, password_hash)
 
 
 async def register_user(request) -> Response:
-    data = await request.json()
+    data = await request.json(loads=json_lib.loads)
     user_type = data.get('user_type')
     name = data.get('name')
     username = data.get('username')
@@ -36,22 +41,25 @@ async def register_user(request) -> Response:
     password_hash = hashlib.sha256(password.encode()).hexdigest()
 
     try:
-        error = create_user(request.app.get('connection_users'), name=name, user_type=user_type, username=username, password_hash=password_hash)
-    except:
+        create_user(request.app.get('connection_users'), name=name, user_type=user_type, username=username, password_hash=password_hash)
+    except ConnectionNotFound:
         return error_response('Не удалось подключение к базе данных')
+    except WrongUserType:
+        return error_response('Неверно указан user_type')
+    except UsernameAlreadyExists:
+        return error_response('Пользователь с таким именем уже зарегистрирован')
+
+    return success_response('Пользователь успешно зарегистрирован')
     # todo обработка результатов регистрации
     # todo тут имеет место дубликация запросов при создании пользователя и сразу за этим - логин
-    if error:
-        return error_response(error)
-
     # todo залогиниться под новым пользователем
-    return await login(request.app.get('connection_users'), request, username, password_hash)
+    return await login_user(request.app.get('connection_users'), request, username, password_hash)
 
 
 async def orders_list(request) -> Response:
     try:
-        open_orders = get_open_orders(request.app.get('connection_orders'))
-    except:
+        open_orders = await get_open_orders(request.app.get('pool_orders'))
+    except ConnectionNotFound:
         return error_response('Не удалось подключение к базе данных')
     return success_response(open_orders)
 
@@ -60,8 +68,10 @@ async def users_list(request) -> Response:
     users_type = request.query.get('users_type')
     try:
         users = await get_users(request.app.get('pool_users'), users_type)
-    except:
+    except ConnectionNotFound:
         return error_response('Не удалось подключение к базе данных')
+    except WrongUserType:
+        return error_response('Неверно указан user_type')
     return success_response(users)
 
 

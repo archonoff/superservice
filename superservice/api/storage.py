@@ -3,19 +3,19 @@ from aiohttp.web import Response
 from aiohttp_session import get_session
 
 from ..utils import error_response, success_response
+from ..exceptions import ConnectionNotFound, WrongUserType, UsernameAlreadyExists
 
 
 # Функции работы с БД
 
 async def get_users(pool_users, users_type=None):
     if pool_users is None:
-        raise Exception()       # todo пока так
+        raise ConnectionNotFound()
     async with pool_users.acquire() as conn:
         async with conn.cursor() as cursor:
-            # connection_users.commit()      # fixme Это помогло с проблемой необновляющихся запросов
             if users_type:
                 if users_type not in ('executor', 'customer'):
-                    return 'Error: Wrong users type'        # todo
+                    raise WrongUserType
                 await cursor.execute('SELECT * FROM users WHERE type="{}";'.format(users_type))
             else:
                 await cursor.execute('SELECT * FROM users;')
@@ -36,25 +36,24 @@ async def get_users(pool_users, users_type=None):
 #     return users
 
 
-def create_user(connection_users, name, user_type, username, password_hash):
+def create_user(connection_users, name, user_type, login, password_hash):
     if connection_users is None:
-        raise Exception()       # todo пока так
+        raise ConnectionNotFound()
     # todo нужна проверка username, чтобы избежать инъекций
     if user_type not in ('executor', 'customer'):
-        return 'Неверно указан user_type'
+        raise WrongUserType
     with connection_users.cursor() as cursor:
-        cursor.execute('SELECT * FROM users WHERE username="{}"'.format(username))
+        cursor.execute('SELECT * FROM users WHERE login="{}"'.format(login))
         users = cursor.fetchall()
         if users:
-            return 'Пользователь с таким именем уже зарегистрирован'
+            raise UsernameAlreadyExists
 
-        cursor.execute('INSERT INTO users (name, type, username, password) VALUES ("{}", "{}", "{}", "{}");'.format(name, user_type, username, password_hash))
-        connection_users.commit()
+        cursor.execute('INSERT INTO users (name, type, login, password) VALUES ("{}", "{}", "{}", "{}");'.format(name, user_type, login, password_hash))
 
 
-async def login(connection_users, request, username, password_hash) -> Response:
+async def login_user(connection_users, request, username, password_hash) -> Response:
     if connection_users is None:
-        raise Exception()       # todo пока так
+        raise ConnectionNotFound()
     with connection_users.cursor() as cursor:
         cursor.execute('SELECT * FROM users WHERE username="{}" and password="{}"'.format(username, password_hash))
         users: list = cursor.fetchall()
@@ -73,11 +72,11 @@ async def login(connection_users, request, username, password_hash) -> Response:
             return success_response('Вы вошли как {}'.format(name))
 
 
-def get_open_orders(connection_orders) -> list:
-    if connection_orders is None:
-        raise Exception()       # todo пока так
-    with connection_orders.cursor() as cursor:
-        connection_orders.commit()      # fixme Это помогло с проблемой необновляющихся запросов
-        cursor.execute('SELECT * FROM orders WHERE fulfilled=0;')
-        open_orders = list(cursor.fetchall())
+async def get_open_orders(pool_orders) -> list:
+    if pool_orders is None:
+        raise ConnectionNotFound()
+    async with pool_orders.acquire() as conn:
+        async with conn.cursor() as cursor:
+            await cursor.execute('SELECT * FROM orders WHERE fulfilled=0;')
+            open_orders = list(await cursor.fetchall())
     return open_orders
