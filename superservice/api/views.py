@@ -24,7 +24,7 @@ async def user_login(request) -> Response:
     password = data.get('password')
     password_hash = hashlib.sha256(password.encode()).hexdigest()
 
-    return await login(request, username, password_hash)
+    return await login(request.app.get('connection_users'), request, username, password_hash)
 
 
 async def register_user(request) -> Response:
@@ -35,14 +35,17 @@ async def register_user(request) -> Response:
     password = data.get('password')
     password_hash = hashlib.sha256(password.encode()).hexdigest()
 
-    error = create_user(name=name, user_type=user_type, username=username, password_hash=password_hash)
+    try:
+        error = create_user(request.app.get('connection_users'), name=name, user_type=user_type, username=username, password_hash=password_hash)
+    except:
+        return error_response('Не удалось подключение к базе данных')
     # todo обработка результатов регистрации
     # todo тут имеет место дубликация запросов при создании пользователя и сразу за этим - логин
     if error:
         return error_response(error)
 
     # todo залогиниться под новым пользователем
-    return await login(request, username, password_hash)
+    return await login(request.app.get('connection_users'), request, username, password_hash)
 
 
 async def orders_list(request) -> Response:
@@ -52,7 +55,10 @@ async def orders_list(request) -> Response:
 
 async def users_list(request) -> Response:
     users_type = request.query.get('users_type')
-    users = await get_users(users_type)
+    try:
+        users = await get_users(request.app.get('pool_users'), users_type)
+    except:
+        return error_response('Не удалось подключение к базе данных')
     return success_response(users)
 
 

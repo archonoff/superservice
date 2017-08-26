@@ -34,6 +34,15 @@ connection_orders = pymysql.connect(host=settings.MYSQL_HOST,
 # asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())     # fixme на маке стало хуже        # todo не нужно, если запускать гуникорном
 loop = asyncio.get_event_loop()
 
+pool_users = loop.run_until_complete(aiomysql.create_pool(host=settings.MYSQL_HOST,
+                                                          port=settings.MYSQL_PORT,
+                                                          user=settings.MYSQL_USER,
+                                                          password=settings.MYSQL_PASSWORD,
+                                                          db=settings.MYSQL_DB,
+                                                          loop=loop,
+                                                          maxsize=50,
+                                                          minsize=10))
+
 app = web.Application(loop=loop)
 app.router.add_get('/', views.index)
 app.router.add_get('/dummy/', views.dummy)
@@ -45,15 +54,9 @@ app.router.add_post('/api/users/login/', views.user_login)
 
 setup_session(app, SimpleCookieStorage())
 
-
-pool_users = loop.run_until_complete(aiomysql.create_pool(host=settings.MYSQL_HOST,
-                                                          port=settings.MYSQL_PORT,
-                                                          user=settings.MYSQL_USER,
-                                                          password=settings.MYSQL_PASSWORD,
-                                                          db=settings.MYSQL_DB,
-                                                          loop=loop,
-                                                          maxsize=50,
-                                                          minsize=10))
+app['pool_users'] = pool_users
+app['connection_users'] = connection_users
+app['connection_orders'] = connection_orders
 
 
 # web.run_app(app, host='localhost', port=8000)     # todo не нужно, если запускать гуникорном
