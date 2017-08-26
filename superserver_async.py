@@ -56,7 +56,7 @@ def get_open_orders():
     with connection_orders.cursor() as cursor:
         connection_orders.commit()      # fixme Это помогло с проблемой необновляющихся запросов
         cursor.execute('SELECT * FROM orders WHERE fulfilled=0;')
-        open_orders = list(cursor.fetchall_buffered())
+        open_orders = list(cursor.fetchall())
     return open_orders
 
 
@@ -106,9 +106,8 @@ async def register_user(request):
 
 
 async def orders_list(request):
-    # open_orders = get_open_orders()
-    # return json_response(open_orders)
-    return web.Response(body='adf')
+    open_orders = get_open_orders()
+    return json_response(open_orders)
 
 
 async def users_list(request):
@@ -117,10 +116,17 @@ async def users_list(request):
     return json_response(users)
 
 
+async def vue(request):
+    with open(settings.BASE_DIR + '/frontend/index.html', 'r') as f:
+        html = f.read()
+    return web.Response(body=html, content_type='text/html', charset='utf-8')
+
+
 # Настройка приложения
 
 app = web.Application()
 app.router.add_get('/', index)
+app.router.add_get('/vue/', vue)
 app.router.add_get('/orders/', orders_list)
 app.router.add_post('/users/', users_list)
 app.router.add_post('/users/register/', register_user)
