@@ -25,23 +25,23 @@ async def index(request) -> Response:
 
 async def user_login(request) -> Response:
     data = await request.json()
-    username = data.get('username')
+    login = data.get('login')
     password = data.get('password')
     password_hash = hashlib.sha256(password.encode()).hexdigest()
 
-    return await login_user(request.app.get('connection_users'), request, username, password_hash)
+    return await login_user(request.app.get('connection_users'), request, login, password_hash)
 
 
 async def register_user(request) -> Response:
     data = await request.json(loads=json_lib.loads)
     user_type = data.get('user_type')
     name = data.get('name')
-    username = data.get('username')
+    login = data.get('login')
     password = data.get('password')
     password_hash = hashlib.sha256(password.encode()).hexdigest()
 
     try:
-        create_user(request.app.get('connection_users'), name=name, user_type=user_type, username=username, password_hash=password_hash)
+        create_user(request.app.get('connection_users'), name=name, user_type=user_type, login=login, password_hash=password_hash)
     except ConnectionNotFound:
         return error_response('Не удалось подключение к базе данных')
     except WrongUserType:
@@ -53,7 +53,7 @@ async def register_user(request) -> Response:
     # todo обработка результатов регистрации
     # todo тут имеет место дубликация запросов при создании пользователя и сразу за этим - логин
     # todo залогиниться под новым пользователем
-    return await login_user(request.app.get('connection_users'), request, username, password_hash)
+    return await login_user(request.app.get('connection_users'), request, login, password_hash)
 
 
 async def orders_list(request) -> Response:
