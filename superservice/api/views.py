@@ -49,7 +49,10 @@ async def register_user(request) -> Response:
 
 
 async def orders_list(request) -> Response:
-    open_orders = get_open_orders()
+    try:
+        open_orders = get_open_orders(request.app.get('connection_orders'))
+    except:
+        return error_response('Не удалось подключение к базе данных')
     return success_response(open_orders)
 
 

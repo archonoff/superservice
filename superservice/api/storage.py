@@ -73,7 +73,9 @@ async def login(connection_users, request, username, password_hash) -> Response:
             return success_response('Вы вошли как {}'.format(name))
 
 
-def get_open_orders() -> list:
+def get_open_orders(connection_orders) -> list:
+    if connection_orders is None:
+        raise Exception()       # todo пока так
     with connection_orders.cursor() as cursor:
         connection_orders.commit()      # fixme Это помогло с проблемой необновляющихся запросов
         cursor.execute('SELECT * FROM orders WHERE fulfilled=0;')
