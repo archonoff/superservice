@@ -1,0 +1,3 @@
+MYSQL_USER = 'root'
+MYSQL_PASSWORD = '1111'
+# MYSQL_PASSWORD = 'ujh_/hqjU9!Y'

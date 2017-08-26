@@ -1,5 +1,5 @@
 from flask import Flask
-from flask import jsonify, request, redirect
+from flask import jsonify, request, redirect, Response
 import pymysql
 
 SYSTEM_COMMISSION = 0.1     # Минимальная комиссия - 1%
@@ -141,6 +141,11 @@ def users_list():
     return jsonify(users)
 
 
+@app.route('/dummy/', methods=['GET'])
+def dummy():
+    return Response(response='dummy')
+
+
 @app.route('/users/add/', methods=['POST'])
 def add_user():
     user_type = request.args.get('user_type')
@@ -152,4 +157,4 @@ def add_user():
 
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    app.run(host='0.0.0.0', port=5000)#, debug=True)
