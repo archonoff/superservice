@@ -36,11 +36,24 @@ connection_orders = pymysql.connect(host=settings.MYSQL_HOST,
 
 loop = asyncio.get_event_loop()
 
+pool_orders = loop.run_until_complete(aiomysql.create_pool(host=settings.MYSQL_HOST,
+                                                           port=settings.MYSQL_PORT,
+                                                           user=settings.MYSQL_USER,
+                                                           password=settings.MYSQL_PASSWORD,
+                                                           db=settings.MYSQL_DB,
+                                                           charset='utf8',
+                                                           cursorclass=aiomysql.cursors.DictCursor,
+                                                           autocommit=True,
+                                                           loop=loop,
+                                                           maxsize=50,
+                                                           minsize=10))
+
 pool_users = loop.run_until_complete(aiomysql.create_pool(host=settings.MYSQL_HOST,
                                                           port=settings.MYSQL_PORT,
                                                           user=settings.MYSQL_USER,
                                                           password=settings.MYSQL_PASSWORD,
                                                           db=settings.MYSQL_DB,
+                                                          charset='utf8',
                                                           cursorclass=aiomysql.cursors.DictCursor,
                                                           autocommit=True,
                                                           loop=loop,
@@ -59,5 +72,6 @@ app.router.add_post('/api/users/login/', views.user_login)
 setup_session(app, SimpleCookieStorage())
 
 app['pool_users'] = pool_users
+app['pool_orders'] = pool_orders
 app['connection_users'] = connection_users
 app['connection_orders'] = connection_orders
