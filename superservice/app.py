@@ -1,5 +1,4 @@
 import asyncio
-import uvloop
 import pymysql
 import aiomysql
 
@@ -27,11 +26,14 @@ connection_orders = pymysql.connect(host=settings.MYSQL_HOST,
                                     cursorclass=pymysql.cursors.DictCursor)
 
 
-
-
 # Настройка приложения
 
-# asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())     # fixme на маке стало хуже        # todo не нужно, если запускать гуникорном
+# try:
+#     import uvloop
+#     asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())     # fixme на маке стало хуже        # todo не нужно, если запускать гуникорном
+# except:
+#     pass
+
 loop = asyncio.get_event_loop()
 
 pool_users = loop.run_until_complete(aiomysql.create_pool(host=settings.MYSQL_HOST,
@@ -39,6 +41,8 @@ pool_users = loop.run_until_complete(aiomysql.create_pool(host=settings.MYSQL_HO
                                                           user=settings.MYSQL_USER,
                                                           password=settings.MYSQL_PASSWORD,
                                                           db=settings.MYSQL_DB,
+                                                          cursorclass=aiomysql.cursors.DictCursor,
+                                                          autocommit=True,
                                                           loop=loop,
                                                           maxsize=50,
                                                           minsize=10))
