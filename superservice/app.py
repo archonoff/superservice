@@ -1,5 +1,4 @@
 import asyncio
-import uvloop
 import pymysql
 import aiomysql
 
@@ -31,7 +30,12 @@ connection_orders = pymysql.connect(host=settings.MYSQL_HOST,
 
 # Настройка приложения
 
-# asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())     # fixme на маке стало хуже        # todo не нужно, если запускать гуникорном
+# try:
+#     import uvloop
+#     asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())     # fixme на маке стало хуже        # todo не нужно, если запускать гуникорном
+# except:
+#     pass
+
 loop = asyncio.get_event_loop()
 
 app = web.Application(loop=loop)
