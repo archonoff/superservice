@@ -3,7 +3,7 @@ from ..exceptions import ConnectionNotFound, WrongUserType, UsernameAlreadyExist
 
 # Функции работы с БД
 
-async def get_users(pool_users, users_type=None):
+async def get_users(pool_users, users_type=None) -> list:
     if pool_users is None:
         raise ConnectionNotFound()
     async with pool_users.acquire() as conn:
@@ -14,21 +14,7 @@ async def get_users(pool_users, users_type=None):
                 await cursor.execute('SELECT * FROM users WHERE type=%s;', (users_type, ))
             else:
                 await cursor.execute('SELECT * FROM users;')
-            users = await cursor.fetchall()     # todo возможно fetchall не лучший вариант
-    return users
-
-
-# def get_users_sync(connection_users, connection_orders, users_type=None):
-#     with connection_users.cursor() as cursor:
-#         connection_users.commit()      # fixme Это помогло с проблемой необновляющихся запросов
-#         if users_type:
-#             if users_type not in ('executor', 'customer'):
-#                 return 'Error: Wrong users type'
-#             cursor.execute('SELECT * FROM users WHERE type="{}";'.format(users_type))
-#         else:
-#             cursor.execute('SELECT * FROM users;')
-#         users = cursor.fetchall()
-#     return users
+            return await cursor.fetchall()     # todo возможно fetchall не лучший вариант
 
 
 async def create_user(pool_users, name, user_type, login, password_hash) -> dict:
@@ -42,6 +28,8 @@ async def create_user(pool_users, name, user_type, login, password_hash) -> dict
             users = await cursor.fetchall()
             if users:
                 raise UsernameAlreadyExists
+
+            # todo между этими двумя запросами блокировать инсерты и апдейты в таблицу
 
             await cursor.execute('INSERT INTO users (name, type, login, password) VALUES (%s, %s, %s, %s);', (name, user_type, login, password_hash))
             return {
