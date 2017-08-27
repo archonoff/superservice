@@ -26,7 +26,6 @@ async def create_user(pool_users, pool_redis_locks, name, user_type, login, pass
         raise WrongUserType
     async with pool_users.acquire() as conn:
         async with conn.cursor() as cursor:
-
             # todo Этот кусок не нужен, если для стоблца login стоит unique
             async with pool_redis_locks.get() as redis:
                 setnx_result = await redis.setnx('user:register:{}'.format(login), 'lock')

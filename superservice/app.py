@@ -23,11 +23,11 @@ loop = asyncio.get_event_loop()
 
 shared_mysql_settings = {
     'charset': 'utf8',
-    'cursorclass': 'aiomysql.cursors.DictCursor',
-    'autocommit': 'True',
-    'loop': 'loop',
-    'minsize': '5',
-    'maxsize': '50',
+    'cursorclass': aiomysql.cursors.DictCursor,
+    'autocommit': True,
+    'loop': loop,
+    'minsize': 5,
+    'maxsize': 50,
 }
 
 # todo предусмотреть переключение на слейва при недоступности мастера

@@ -37,9 +37,9 @@ def give_json(users_count: int):
 
 def main():
     url = 'http://127.0.0.1:8000/api/users/register/'
-    threads_count = 2
+    threads_count = 10
     for i in range(threads_count):
-        t = Sender(5, url, i)
+        t = Sender(20, url, i)
         logging.debug('Запуск треда {}'.format(i+1))
         t.start()
     logging.debug('Все треды запущены')
