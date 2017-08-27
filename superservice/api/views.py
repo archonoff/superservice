@@ -5,7 +5,7 @@ try:
 except:
     import json as json_lib
 
-from pymysql.err import IntegrityError
+from pymysql.err import IntegrityError, DataError
 
 from aiohttp import web
 from aiohttp.web import Response
@@ -104,6 +104,10 @@ async def post_order(request) -> Response:
         order = await create_order(request.app.get('pool_orders'), title, value, customer_id)
     except OrderValueTooSmall:
         return error_response('Сумма заказа слишком мала')
+    except ValueError:
+        return error_response('Неверное значение суммы заказа')
+    except DataError:
+        return error_response('Неверное значение суммы заказа')
 
     return success_response(order)
 
