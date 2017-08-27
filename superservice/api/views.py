@@ -55,17 +55,14 @@ async def register_user(request) -> Response:
     password_hash = hashlib.sha256(password.encode()).hexdigest()
 
     try:
-        user = await create_user(request.app.get('pool_users'), request.app.get('pool_redis_locks'), name, user_type, login, password_hash)
+        user = await create_user(request.app.get('pool_users'), name, user_type, login, password_hash)
     except MySQLConnectionNotFound:
         return error_response('Не удалось подключение к базе данных')
         # todo возможно тут переключаться на слейв
-    except RedisConnectionNotFound:
-        return error_response('Не удалось подключение к базе данных')
     except WrongUserType:
         return error_response('Неверно указан user_type')
     except (UsernameAlreadyExists, IntegrityError):
         return error_response('Пользователь с таким именем уже зарегистрирован')
-    # todo добавить исключения коннекта к редису
 
     save_user_to_session(await get_session(request), user)
 

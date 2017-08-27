@@ -17,45 +17,22 @@ async def get_users(pool_users, users_type=None) -> list:
             return await cursor.fetchall()     # todo возможно fetchall не лучший вариант
 
 
-async def create_user(pool_users, pool_redis_locks, name, user_type, login, password_hash) -> dict:
+async def create_user(pool_users, name, user_type, login, password_hash) -> dict:
     if pool_users is None:
         raise MySQLConnectionNotFound()
-    if pool_redis_locks is None:
-        raise RedisConnectionNotFound()
     if user_type not in ('executor', 'customer'):
         raise WrongUserType
     async with pool_users.acquire() as conn:
         async with conn.cursor() as cursor:
-            # todo Этот кусок не нужен, если для стоблца login стоит unique
-            async with pool_redis_locks.get() as redis:
-                setnx_result = await redis.setnx('user:register:{}'.format(login), 'lock')
+            # Следующая строчка может выкинуть IntegrityError
+            await cursor.execute('INSERT INTO users (name, type, login, password) VALUES (%s, %s, %s, %s);', (name, user_type, login, password_hash))
 
-            if setnx_result:
-                # Если запись прошла успешно, значит можно попытаться зарегистрировать юзера
-                await cursor.execute('SELECT * FROM users WHERE login=%s;', (login, ))
-                users = await cursor.fetchall()
-                if users:
-                    raise UsernameAlreadyExists
-
-                # todo между этими двумя запросами блокировать инсерты и апдейты в таблицу
-
-                # Следующая строчка может выкинуть IntegrityError
-                await cursor.execute('INSERT INTO users (name, type, login, password) VALUES (%s, %s, %s, %s);', (name, user_type, login, password_hash))
-
-                # После записи пользователя в мускул - освобождение лока логина
-                with await pool_redis_locks as redis:
-                    await redis.delete('user:register:{}'.format(login))
-
-                return {
-                    'id': cursor.lastrowid,
-                    'name': name,
-                    'user_type': user_type,
-                    'login': login,
-                }
-            else:
-                # Иначе регистрация юзера с этим именем уже в процессе
-                raise UsernameAlreadyExists
-
+            return {
+                'id': cursor.lastrowid,
+                'name': name,
+                'user_type': user_type,
+                'login': login,
+            }
 
 
 async def check_user(pool_users, login, password_hash) -> dict:
