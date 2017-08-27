@@ -24,6 +24,7 @@ async def create_user(pool_users, name, user_type, login, password_hash) -> dict
         raise WrongUserType
     async with pool_users.acquire() as conn:
         async with conn.cursor() as cursor:
+            # todo Этот кусок не нужен, если для стоблца login стоит unique
             await cursor.execute('SELECT * FROM users WHERE login=%s;', (login, ))
             users = await cursor.fetchall()
             if users:
@@ -31,6 +32,7 @@ async def create_user(pool_users, name, user_type, login, password_hash) -> dict
 
             # todo между этими двумя запросами блокировать инсерты и апдейты в таблицу
 
+            # Следующая строчка может выкинуть IntegrityError
             await cursor.execute('INSERT INTO users (name, type, login, password) VALUES (%s, %s, %s, %s);', (name, user_type, login, password_hash))
             return {
                 'id': cursor.lastrowid,

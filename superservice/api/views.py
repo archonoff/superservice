@@ -5,13 +5,14 @@ try:
 except:
     import json as json_lib
 
-from .. import settings
+from pymysql.err import IntegrityError
 
 from aiohttp import web
 from aiohttp.web import Response
 
 from aiohttp_session import get_session
 
+from .. import settings
 from .storage import check_user, create_user, get_open_orders, get_users
 from ..utils import success_response, error_response, login_required, save_user_to_session
 from ..exceptions import ConnectionNotFound, WrongUserType, UsernameAlreadyExists, WrongLoginOrPassword, DBConsistencyError
@@ -59,7 +60,7 @@ async def register_user(request) -> Response:
         return error_response('Не удалось подключение к базе данных')
     except WrongUserType:
         return error_response('Неверно указан user_type')
-    except UsernameAlreadyExists:
+    except (UsernameAlreadyExists, IntegrityError):
         return error_response('Пользователь с таким именем уже зарегистрирован')
 
     save_user_to_session(await get_session(request), user)
