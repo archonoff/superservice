@@ -13,7 +13,7 @@ from aiohttp.web import Response
 from aiohttp_session import get_session
 
 from .. import settings
-from .storage import check_user, create_user, get_open_orders, get_users, create_order
+from .storage import check_user, create_user, get_open_orders, get_users, create_order, find_order
 from ..utils import success_response, error_response, login_required, save_user_to_session
 from ..exceptions import MySQLConnectionNotFound, WrongUserType, UsernameAlreadyExists, WrongLoginOrPassword, \
     DBConsistencyError, RedisConnectionNotFound, OrderValueTooSmall
@@ -104,6 +104,15 @@ async def post_order(request) -> Response:
         order = await create_order(request.app.get('pool_orders'), title, value, customer_id)
     except OrderValueTooSmall:
         return error_response('Сумма заказа слишком мала')
+
+    return success_response(order)
+
+
+@login_required()
+async def get_order(request) -> Response:
+    order_id = request.match_info.get('order_id')
+
+    order = await find_order(request.app.get('pool_orders'), order_id)
 
     return success_response(order)
 

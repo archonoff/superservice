@@ -1,3 +1,5 @@
+from aiohttp.web import HTTPNotFound
+
 from .. import settings
 from ..exceptions import MySQLConnectionNotFound, WrongUserType, WrongLoginOrPassword, DBConsistencyError, \
     RedisConnectionNotFound, OrderValueTooSmall
@@ -63,11 +65,34 @@ async def get_open_orders(pool_orders) -> list:
     return open_orders
 
 
-async def create_order(pool_orders, title, value, customer_id):
+async def create_order(pool_orders, title, value, customer_id) -> dict:
     if pool_orders is None:
         raise MySQLConnectionNotFound()
-    if value < settings.ORDER_MIN_VALUE:
+    if float(value) < settings.ORDER_MIN_VALUE:
         raise OrderValueTooSmall
     async with pool_orders.acquire() as conn:
         async with conn.cursor() as cursor:
             await cursor.execute('INSERT INTO orders (title, value, customer_id) VALUES (%s, %s, %s);', (title, value, customer_id))
+
+            return {
+                'id': cursor.lastrowid,
+                'title': title,
+                'value': value,
+                'customer_id': customer_id,
+                'fulfilled': 0,
+                'executor_id': None
+            }
+
+
+async def find_order(pool_orders, order_id) -> dict:
+    if pool_orders is None:
+        raise MySQLConnectionNotFound()
+    async with pool_orders.acquire() as conn:
+        async with conn.cursor() as cursor:
+            await cursor.execute('SELECT * FROM orders WHERE id=%s;', (order_id, ))
+            order = await cursor.fetchone()
+
+            if order is None:
+                raise HTTPNotFound
+
+            return order
