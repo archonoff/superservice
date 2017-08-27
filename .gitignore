@@ -141,3 +141,4 @@ ENV/
 
 /.idea/
 /settings_local.py
+/mqsql-model.mwb.bak
