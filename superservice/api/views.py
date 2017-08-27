@@ -15,7 +15,7 @@ from aiohttp_session import get_session
 from .. import settings
 from .storage import check_user, create_user, get_open_orders, get_users
 from ..utils import success_response, error_response, login_required, save_user_to_session
-from ..exceptions import ConnectionNotFound, WrongUserType, UsernameAlreadyExists, WrongLoginOrPassword, DBConsistencyError
+from ..exceptions import MySQLConnectionNotFound, WrongUserType, UsernameAlreadyExists, WrongLoginOrPassword, DBConsistencyError, RedisConnectionNotFound
 
 
 # Хэндлеры
@@ -34,7 +34,7 @@ async def login_user(request) -> Response:
 
     try:
         user = await check_user(request.app.get('pool_users'), login, password_hash)
-    except ConnectionNotFound:
+    except MySQLConnectionNotFound:
         return error_response('Не удалось подключение к базе данных')
     except WrongLoginOrPassword:
         return error_response('Неправильное имя пользователя или пароль')
@@ -55,13 +55,17 @@ async def register_user(request) -> Response:
     password_hash = hashlib.sha256(password.encode()).hexdigest()
 
     try:
-        user = await create_user(request.app.get('pool_users'), name, user_type, login, password_hash)
-    except ConnectionNotFound:
+        user = await create_user(request.app.get('pool_users'), request.app.get('pool_redis_locks'), name, user_type, login, password_hash)
+    except MySQLConnectionNotFound:
+        return error_response('Не удалось подключение к базе данных')
+        # todo возможно тут переключаться на слейв
+    except RedisConnectionNotFound:
         return error_response('Не удалось подключение к базе данных')
     except WrongUserType:
         return error_response('Неверно указан user_type')
     except (UsernameAlreadyExists, IntegrityError):
         return error_response('Пользователь с таким именем уже зарегистрирован')
+    # todo добавить исключения коннекта к редису
 
     save_user_to_session(await get_session(request), user)
 
@@ -71,7 +75,7 @@ async def register_user(request) -> Response:
 async def orders_list(request) -> Response:
     try:
         open_orders = await get_open_orders(request.app.get('pool_orders'))
-    except ConnectionNotFound:
+    except MySQLConnectionNotFound:
         return error_response('Не удалось подключение к базе данных')
     return success_response(open_orders)
 
@@ -81,7 +85,7 @@ async def users_list(request) -> Response:
     users_type = request.query.get('users_type')
     try:
         users = await get_users(request.app.get('pool_users'), users_type)
-    except ConnectionNotFound:
+    except MySQLConnectionNotFound:
         return error_response('Не удалось подключение к базе данных')
     except WrongUserType:
         return error_response('Неверно указан user_type')

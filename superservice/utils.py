@@ -32,8 +32,8 @@ def save_user_to_session(session, user: dict):
     session['user_type'] = user.get('user_type')
 
 
-def code_response(status: str, code: int) -> Response:
-    def rest_response(data=None):
+def code_response(status: str, code: int):
+    def rest_response(data=None) -> Response:
         result_dict = {
             'result': status,
             'data': data,

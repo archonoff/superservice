@@ -1,4 +1,8 @@
-class ConnectionNotFound(Exception):
+class MySQLConnectionNotFound(Exception):
+    pass
+
+
+class RedisConnectionNotFound(Exception):
     pass
 
 

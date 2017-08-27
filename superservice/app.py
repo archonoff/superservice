@@ -1,5 +1,6 @@
 import asyncio
 import aiomysql
+import aioredis
 
 from aiohttp import web
 
@@ -25,10 +26,12 @@ shared_mysql_settings = {
     'cursorclass': 'aiomysql.cursors.DictCursor',
     'autocommit': 'True',
     'loop': 'loop',
+    'minsize': '5',
     'maxsize': '50',
-    'minsize': '10',
 }
 
+# todo предусмотреть переключение на слейва при недоступности мастера
+# Путы подключения к мусклу
 # Если таблицы находятся на разных серверах - указать соответсвующие настройки
 pool_orders = loop.run_until_complete(aiomysql.create_pool(host=settings.MYSQL_HOST,
                                                            port=settings.MYSQL_PORT,
@@ -44,6 +47,19 @@ pool_users = loop.run_until_complete(aiomysql.create_pool(host=settings.MYSQL_HO
                                                           db=settings.MYSQL_DB,
                                                           **shared_mysql_settings))
 
+# Пулы подключения к редису
+pool_redis_locks = loop.run_until_complete(aioredis.create_pool((settings.REDIS_HOST, settings.REDIS_PORT),
+                                                                db=0,
+                                                                loop=loop,
+                                                                minsize=5,
+                                                                maxsize=50))
+
+pool_redis_sessions = loop.run_until_complete(aioredis.create_pool((settings.REDIS_HOST, settings.REDIS_PORT),
+                                                                   db=1,
+                                                                   loop=loop,
+                                                                   minsize=5,
+                                                                   maxsize=50))
+
 app = web.Application(loop=loop)
 app.router.add_get('/', views.index)
 app.router.add_get('/dummy/', views.dummy)
@@ -57,3 +73,6 @@ setup_session(app, SimpleCookieStorage())
 
 app['pool_users'] = pool_users
 app['pool_orders'] = pool_orders
+
+app['pool_redis_locks'] = pool_redis_locks
+app['pool_redis_sessions'] = pool_redis_sessions
