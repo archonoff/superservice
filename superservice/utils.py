@@ -32,14 +32,14 @@ def save_user_to_session(session, user: dict):
     session['user_type'] = user.get('user_type')
 
 
-def code_response(code: str) -> Response:
+def code_response(status: str, code: int) -> Response:
     def rest_response(data=None):
         result_dict = {
-            'result': code,
+            'result': status,
             'data': data,
         }
-        return json_response(result_dict, dumps=json_lib.dumps)
+        return json_response(result_dict, status=code, dumps=json_lib.dumps)
     return rest_response
 
-success_response = code_response('success')
-error_response = code_response('error')
+success_response = code_response('success', 200)
+error_response = code_response('error', 400)
