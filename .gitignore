@@ -141,3 +141,4 @@ ENV/
 
 /.idea/
 /settings_local.py
+/superservice/settings_local.py
