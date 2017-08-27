@@ -3,7 +3,26 @@ try:
 except:
     import json as json_lib
 
-from aiohttp.web import json_response, Response
+from functools import wraps
+
+from aiohttp.web import json_response, Response, HTTPUnauthorized
+
+from aiohttp_session import get_session
+
+
+def login_required(func):
+    @wraps(func)
+    async def wrapper(request):
+        session = await get_session(request)
+        user_id = session.get('user_id')
+        if user_id:
+            # Пользователь залогинен
+            return await func(request)
+        else:
+            # Пользователь не залогинен
+            raise HTTPUnauthorized
+
+    return wrapper
 
 
 def code_response(code: str) -> Response:
