@@ -74,5 +74,5 @@ async def get_open_orders(pool_orders) -> list:
     async with pool_orders.acquire() as conn:
         async with conn.cursor() as cursor:
             await cursor.execute('SELECT * FROM orders WHERE fulfilled=0;')
-            open_orders = list(await cursor.fetchall())     # todo возможно fetchall - не лучший вариант
+            open_orders = await cursor.fetchall()     # todo возможно fetchall - не лучший вариант
     return open_orders
