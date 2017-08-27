@@ -70,6 +70,7 @@ async def register_user(request) -> Response:
     return success_response('Пользователь успешно зарегистрирован')
 
 
+# todo @login_required()
 async def orders_list(request) -> Response:
     try:
         open_orders = await get_open_orders(request.app.get('pool_orders'))
@@ -78,7 +79,7 @@ async def orders_list(request) -> Response:
     return success_response(open_orders)
 
 
-@login_required
+@login_required()
 async def users_list(request) -> Response:
     users_type = request.query.get('users_type')
     try:
@@ -90,8 +91,7 @@ async def users_list(request) -> Response:
     return success_response(users)
 
 
-# todo только для user_type == customer
-# @login_required
+@login_required('customer')
 async def post_order(request) -> Response:
     data = await request.json(loads=json_lib.loads)
     title = data.get('title')
