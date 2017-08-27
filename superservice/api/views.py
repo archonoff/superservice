@@ -13,9 +13,10 @@ from aiohttp.web import Response
 from aiohttp_session import get_session
 
 from .. import settings
-from .storage import check_user, create_user, get_open_orders, get_users
+from .storage import check_user, create_user, get_open_orders, get_users, create_order
 from ..utils import success_response, error_response, login_required, save_user_to_session
-from ..exceptions import MySQLConnectionNotFound, WrongUserType, UsernameAlreadyExists, WrongLoginOrPassword, DBConsistencyError, RedisConnectionNotFound
+from ..exceptions import MySQLConnectionNotFound, WrongUserType, UsernameAlreadyExists, WrongLoginOrPassword, \
+    DBConsistencyError, RedisConnectionNotFound, OrderValueTooSmall
 
 
 # Хэндлеры
@@ -87,6 +88,24 @@ async def users_list(request) -> Response:
     except WrongUserType:
         return error_response('Неверно указан user_type')
     return success_response(users)
+
+
+# todo только для user_type == customer
+# @login_required
+async def post_order(request) -> Response:
+    data = await request.json(loads=json_lib.loads)
+    title = data.get('title')
+    value = data.get('value')
+
+    session = await get_session(request)
+    customer_id = session.get('user_id')        # т.к. в эту вьюху пускают только заказчиков
+
+    try:
+        order = await create_order(request.app.get('pool_orders'), title, value, customer_id)
+    except OrderValueTooSmall:
+        return error_response('Сумма заказа слишком мала')
+
+    return success_response(order)
 
 
 async def dummy(request) -> Response:

@@ -64,6 +64,8 @@ app = web.Application(loop=loop)
 app.router.add_get('/', views.index)
 app.router.add_get('/dummy/', views.dummy)
 app.router.add_get('/api/orders/', views.orders_list)
+app.router.add_post('/api/orders/create/', views.post_order)
+
 app.router.add_get('/api/users/', views.users_list)
 app.router.add_post('/api/users/register/', views.register_user)
 app.router.add_post('/api/users/login/', views.login_user)

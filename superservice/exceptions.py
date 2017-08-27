@@ -20,3 +20,7 @@ class WrongLoginOrPassword(Exception):
 
 class DBConsistencyError(Exception):
     pass
+
+
+class OrderValueTooSmall(Exception):
+    pass

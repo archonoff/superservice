@@ -1,4 +1,6 @@
-from ..exceptions import MySQLConnectionNotFound, WrongUserType, UsernameAlreadyExists, WrongLoginOrPassword, DBConsistencyError, RedisConnectionNotFound
+from .. import settings
+from ..exceptions import MySQLConnectionNotFound, WrongUserType, WrongLoginOrPassword, DBConsistencyError, \
+    RedisConnectionNotFound, OrderValueTooSmall
 
 
 # Функции работы с БД
@@ -59,3 +61,13 @@ async def get_open_orders(pool_orders) -> list:
             await cursor.execute('SELECT * FROM orders WHERE fulfilled=0;')
             open_orders = await cursor.fetchall()     # todo возможно fetchall - не лучший вариант
     return open_orders
+
+
+async def create_order(pool_orders, title, value, customer_id):
+    if pool_orders is None:
+        raise MySQLConnectionNotFound()
+    if value < settings.ORDER_MIN_VALUE:
+        raise OrderValueTooSmall
+    async with pool_orders.acquire() as conn:
+        async with conn.cursor() as cursor:
+            await cursor.execute('INSERT INTO orders (title, value, customer_id) VALUES (%s, %s, %s);', (title, value, customer_id))
