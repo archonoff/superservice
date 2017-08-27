@@ -17,12 +17,14 @@ connection_users = pymysql.connect(host=settings.MYSQL_HOST,
                                    password=settings.MYSQL_PASSWORD,
                                    db=settings.MYSQL_DB,
                                    charset='utf8',
+                                   autocommit=True,
                                    cursorclass=pymysql.cursors.DictCursor)
 connection_orders = pymysql.connect(host=settings.MYSQL_HOST,
                                     user=settings.MYSQL_USER,
                                     password=settings.MYSQL_PASSWORD,
                                     db=settings.MYSQL_DB,
                                     charset='utf8',
+                                    autocommit=True,
                                     cursorclass=pymysql.cursors.DictCursor)
 
 
@@ -66,7 +68,7 @@ app.router.add_get('/dummy/', views.dummy)
 app.router.add_get('/api/orders/', views.orders_list)
 app.router.add_get('/api/users/', views.users_list)
 app.router.add_post('/api/users/register/', views.register_user)
-app.router.add_post('/api/users/login/', views.user_login)
+app.router.add_post('/api/users/login/', views.login_user)
 # app.router.add_get('/{name}', handle)     # todo для примера
 
 setup_session(app, SimpleCookieStorage())

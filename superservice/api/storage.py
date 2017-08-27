@@ -1,9 +1,4 @@
-from aiohttp.web import Response
-
-from aiohttp_session import get_session
-
-from ..utils import error_response, success_response
-from ..exceptions import ConnectionNotFound, WrongUserType, UsernameAlreadyExists
+from ..exceptions import ConnectionNotFound, WrongUserType, UsernameAlreadyExists, WrongLoginOrPassword, DBConsistencyError
 
 
 # Функции работы с БД
@@ -16,10 +11,10 @@ async def get_users(pool_users, users_type=None):
             if users_type:
                 if users_type not in ('executor', 'customer'):
                     raise WrongUserType
-                await cursor.execute('SELECT * FROM users WHERE type="{}";'.format(users_type))
+                await cursor.execute('SELECT * FROM users WHERE type=%s;', (users_type, ))
             else:
                 await cursor.execute('SELECT * FROM users;')
-            users = await cursor.fetchall()
+            users = await cursor.fetchall()     # todo возможно fetchall не лучший вариант
     return users
 
 
@@ -36,40 +31,41 @@ async def get_users(pool_users, users_type=None):
 #     return users
 
 
-def create_user(connection_users, name, user_type, login, password_hash):
-    if connection_users is None:
+async def create_user(pool_users, name, user_type, login, password_hash) -> dict:
+    if pool_users is None:
         raise ConnectionNotFound()
-    # todo нужна проверка username, чтобы избежать инъекций
     if user_type not in ('executor', 'customer'):
         raise WrongUserType
-    with connection_users.cursor() as cursor:
-        cursor.execute('SELECT * FROM users WHERE login="{}"'.format(login))
-        users = cursor.fetchall()
-        if users:
-            raise UsernameAlreadyExists
+    async with pool_users.acquire() as conn:
+        async with conn.cursor() as cursor:
+            await cursor.execute('SELECT * FROM users WHERE login=%s;', (login, ))
+            users = await cursor.fetchall()
+            if users:
+                raise UsernameAlreadyExists
 
-        cursor.execute('INSERT INTO users (name, type, login, password) VALUES ("{}", "{}", "{}", "{}");'.format(name, user_type, login, password_hash))
+            await cursor.execute('INSERT INTO users (name, type, login, password) VALUES (%s, %s, %s, %s);', (name, user_type, login, password_hash))
+            return {
+                'id': cursor.lastrowid,
+                'name': name,
+                'user_type': user_type,
+                'login': login,
+            }
 
 
-async def login_user(connection_users, request, username, password_hash) -> Response:
-    if connection_users is None:
+async def check_user(pool_users, login, password_hash) -> dict:
+    if pool_users is None:
         raise ConnectionNotFound()
-    with connection_users.cursor() as cursor:
-        cursor.execute('SELECT * FROM users WHERE username="{}" and password="{}"'.format(username, password_hash))
-        users: list = cursor.fetchall()
-        users_len = len(users)
-        if users_len == 0:
-            return error_response('Неправильное имя пользователя или пароль')
-        elif users_len >= 2:
-            return error_response('Ошибка в базе данных: больше одного пользователя')
-        else:
-            user_id = users[0].get('id')
-            name = users[0].get('name')
-
-            session = await get_session(request)
-            session['user_id'] = user_id
-            session['username'] = username
-            return success_response('Вы вошли как {}'.format(name))
+    async with pool_users.acquire() as conn:
+        async with conn.cursor() as cursor:
+            await cursor.execute('SELECT * FROM users WHERE login=%s and password=%s', (login, password_hash))
+            users: list = await cursor.fetchall()
+            users_len = len(users)
+            if users_len == 0:
+                raise WrongLoginOrPassword
+            elif users_len >= 2:
+                raise DBConsistencyError
+            else:
+                return users[0]
 
 
 async def get_open_orders(pool_orders) -> list:
@@ -78,5 +74,5 @@ async def get_open_orders(pool_orders) -> list:
     async with pool_orders.acquire() as conn:
         async with conn.cursor() as cursor:
             await cursor.execute('SELECT * FROM orders WHERE fulfilled=0;')
-            open_orders = list(await cursor.fetchall())
+            open_orders = list(await cursor.fetchall())     # todo возможно fetchall - не лучший вариант
     return open_orders

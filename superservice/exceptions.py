@@ -8,3 +8,11 @@ class UsernameAlreadyExists(Exception):
 
 class WrongUserType(Exception):
     pass
+
+
+class WrongLoginOrPassword(Exception):
+    pass
+
+
+class DBConsistencyError(Exception):
+    pass

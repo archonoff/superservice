@@ -25,6 +25,13 @@ def login_required(func):
     return wrapper
 
 
+def save_user_to_session(session, user: dict):
+    session['user_id'] = user.get('id')
+    session['name'] = user.get('name')
+    session['login'] = user.get('login')
+    session['user_type'] = user.get('user_type')
+
+
 def code_response(code: str) -> Response:
     def rest_response(data=None):
         result_dict = {
