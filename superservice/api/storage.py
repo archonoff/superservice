@@ -68,6 +68,7 @@ async def get_open_orders(pool_orders) -> list:
 async def create_order(pool_orders, title, value, customer_id) -> dict:
     if pool_orders is None:
         raise MySQLConnectionNotFound()
+    # todo округлять value до сотых долей в ближайшую сторону
     if float(value) < settings.ORDER_MIN_VALUE:
         raise OrderValueTooSmall
     async with pool_orders.acquire() as conn:
