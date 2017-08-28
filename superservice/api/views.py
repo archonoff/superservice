@@ -28,10 +28,19 @@ async def index(request) -> Response:
 
 
 async def login_user(request) -> Response:
-    data = await request.json(loads=json_lib.loads)
-    login = data.get('login')
-    password = data.get('password')
-    password_hash = hashlib.sha256(password.encode()).hexdigest()
+    try:
+        data = await request.json(loads=json_lib.loads)
+    except ValueError:
+        return error_response('Ошибка входных данных')
+
+    try:
+        login = data['login']
+        password = data['password']
+        password_hash = hashlib.sha256(password.encode()).hexdigest()
+    except KeyError:
+        return error_response('Недостаточно входных данных')
+    except AttributeError:
+        return error_response('Ошибка входных данных')
 
     try:
         user = await check_user(request.app.get('pool_users'), login, password_hash)
@@ -41,6 +50,9 @@ async def login_user(request) -> Response:
         return error_response('Неправильное имя пользователя или пароль')
     except DBConsistencyError:
         return error_response('Ошибка в базе данных: больше одного пользователя с одинаковым именем пользователя')
+    except (DataError, IntegrityError):
+        # Можно проверять входные данные, чтобы точно определять ошибку
+        return error_response('Ошибка входых данных')
 
     save_user_to_session(await get_session(request), user)
 
@@ -48,12 +60,21 @@ async def login_user(request) -> Response:
 
 
 async def register_user(request) -> Response:
-    data = await request.json(loads=json_lib.loads)
-    user_type = data.get('user_type')
-    name = data.get('name')
-    login = data.get('login')
-    password = data.get('password')
-    password_hash = hashlib.sha256(password.encode()).hexdigest()
+    try:
+        data = await request.json(loads=json_lib.loads)
+    except ValueError:
+        return error_response('Ошибка входных данных')
+
+    try:
+        user_type = data['user_type']
+        name = data['nameq']
+        login = data['login']
+        password = data['password']
+        password_hash = hashlib.sha256(password.encode()).hexdigest()
+    except KeyError:
+        return error_response('Недостаточно входных данных')
+    except AttributeError:
+        return error_response('Ошибка входных данных')
 
     try:
         user = await create_user(request.app.get('pool_users'), name, user_type, login, password_hash)
@@ -64,6 +85,9 @@ async def register_user(request) -> Response:
         return error_response('Неверно указан user_type')
     except (UsernameAlreadyExists, IntegrityError):
         return error_response('Пользователь с таким именем уже зарегистрирован')
+    except DataError:
+        # Можно проверять входные данные, чтобы точно определять ошибку
+        return error_response('Ошибка входых данных')
 
     save_user_to_session(await get_session(request), user)
 
@@ -93,21 +117,33 @@ async def users_list(request) -> Response:
 
 @login_required('customer')
 async def post_order(request) -> Response:
-    data = await request.json(loads=json_lib.loads)
-    title = data.get('title')
-    value = data.get('value')
+    try:
+        data = await request.json(loads=json_lib.loads)
+    except ValueError:
+        return error_response('Ошибка входных данных')
+
+    try:
+        title = data['title']
+        value = data['value']
+    except KeyError:
+        return error_response('Недостаточно входных данных')
+    except AttributeError:
+        return error_response('Ошибка входных данных')
 
     session = await get_session(request)
     customer_id = session.get('user_id')        # т.к. в эту вьюху пускают только заказчиков
 
     try:
         order = await create_order(request.app.get('pool_orders'), title, value, customer_id)
+    except MySQLConnectionNotFound:
+        return error_response('Не удалось подключение к базе данных')
     except OrderValueTooSmall:
         return error_response('Сумма заказа слишком мала')
     except ValueError:
         return error_response('Неверное значение суммы заказа')
-    except DataError:
-        return error_response('Неверное значение суммы заказа')
+    except (DataError, IntegrityError):
+        # Можно проверять входные данные, чтобы точно определять ошибку
+        return error_response('Ошибка входых данных')
 
     return success_response(order)
 
@@ -116,7 +152,10 @@ async def post_order(request) -> Response:
 async def get_order(request) -> Response:
     order_id = request.match_info.get('order_id')
 
-    order = await find_order(request.app.get('pool_orders'), order_id)
+    try:
+        order = await find_order(request.app.get('pool_orders'), order_id)
+    except MySQLConnectionNotFound:
+        return error_response('Не удалось подключение к базе данных')
 
     return success_response(order)
 
