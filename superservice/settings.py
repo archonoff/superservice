@@ -10,6 +10,7 @@ ORDER_MIN_VALUE = 1         # Минимальаня сумма заказа - 1
 
 LOCK_ATTEMPTS_COUNT = 10        # Колисчество попыток повесить лок
 LOCK_ATTEMPTS_TIMEOUT = 0.5     # Задержка между попытками обращения
+LOCK_EXPIRE_TIMEOUT = 120       # todo рискованная затея
 
 
 # Хранилища

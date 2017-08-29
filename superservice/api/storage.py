@@ -119,6 +119,7 @@ async def fulfill_order(pool_orders, pool_users, pool_redis_locks, order_id, exe
 
                         if setnx_order_result:
                             # Если успешно установлен лок на заказ
+                            await redis.expire('order:fulfill:{}'.format(order_id), settings.LOCK_EXPIRE_TIMEOUT)
                             break
 
                         await asyncio.sleep(settings.LOCK_ATTEMPTS_TIMEOUT)
@@ -147,6 +148,7 @@ async def fulfill_order(pool_orders, pool_users, pool_redis_locks, order_id, exe
                             setnx_1_result = await redis.setnx('user:fulfill:{}'.format(max(customer_id, executor_id)), 'lock')
 
                         if setnx_1_result:
+                            await redis.expire('user:fulfill:{}'.format(max(customer_id, executor_id)), settings.LOCK_EXPIRE_TIMEOUT)
                             break
 
                         await asyncio.sleep(settings.LOCK_ATTEMPTS_TIMEOUT)
@@ -163,6 +165,7 @@ async def fulfill_order(pool_orders, pool_users, pool_redis_locks, order_id, exe
                             setnx_2_result = await redis.setnx('user:fulfill:{}'.format(min(customer_id, executor_id)), 'lock')
 
                         if setnx_2_result:
+                            await redis.expire('user:fulfill:{}'.format(min(customer_id, executor_id)), settings.LOCK_EXPIRE_TIMEOUT)
                             break
 
                         await asyncio.sleep(settings.LOCK_ATTEMPTS_TIMEOUT)
