@@ -18,12 +18,17 @@ from ..utils import success_response, error_response, login_required, save_user_
 from .. import exceptions
 
 
-# Хэндлеры
-
 async def index(request) -> Response:
     with open(os.path.join(settings.BASE_DIR, 'frontend', 'index.html'), 'r') as f:
         html = f.read()
     return web.Response(body=html, content_type='text/html', charset='utf-8')
+
+
+@login_required()
+async def logout_user(request) -> Response:
+    session = await get_session(request)
+    session.invalidate()
+    return success_response('Вы успешно вышли из системы')
 
 
 async def login_user(request) -> Response:
@@ -59,6 +64,7 @@ async def login_user(request) -> Response:
 
 
 async def register_user(request) -> Response:
+    # todo не пускать пользователя, если он залогинен
     try:
         data = await request.json(loads=json_lib.loads)
     except ValueError:
@@ -66,7 +72,7 @@ async def register_user(request) -> Response:
 
     try:
         user_type = data['user_type']
-        name = data['nameq']
+        name = data['name']
         login = data['login']
         password = data['password']
         password_hash = hashlib.sha256(password.encode()).hexdigest()
@@ -93,7 +99,7 @@ async def register_user(request) -> Response:
     return success_response('Пользователь успешно зарегистрирован')
 
 
-# todo @login_required()
+@login_required()
 async def orders_list(request) -> Response:
     try:
         open_orders = await get_open_orders(request.app.get('pool_orders'))

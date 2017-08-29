@@ -64,7 +64,6 @@ pool_redis_sessions = loop.run_until_complete(aioredis.create_pool((settings.RED
 # todo хочу автоматический закрывающий слеш
 app = web.Application(loop=loop)
 app.router.add_get('/', views.index)
-app.router.add_get('/dummy/', views.dummy)
 app.router.add_get('/api/orders/', views.orders_list)
 app.router.add_post('/api/orders/add/', views.post_order)
 app.router.add_get(r'/api/orders/{order_id:\d+}/', views.get_order)
@@ -73,8 +72,9 @@ app.router.add_put(r'/api/orders/{order_id:\d+}/fulfill/', views.update_order)
 app.router.add_get('/api/users/', views.users_list)
 app.router.add_post('/api/users/register/', views.register_user)
 app.router.add_post('/api/users/login/', views.login_user)
+app.router.add_get('/api/users/logout/', views.logout_user)
 
-setup_session(app, SimpleCookieStorage())
+setup_session(app, SimpleCookieStorage(cookie_name='SUPERSERVICE_SESSION'))
 
 app['pool_users'] = pool_users
 app['pool_orders'] = pool_orders
