@@ -212,6 +212,7 @@ async def fulfill_order(pool_orders, pool_users, pool_redis_locks, order_id, exe
                     # Заказ отмечается как исполненный
                     await cursor_orders.execute('UPDATE orders SET fulfilled="1", executor_id=%s WHERE id=%s;', (executor_id, order_id))
                     order['fulfilled'] = 1
+                    order['executor_id'] = executor_id
 
                     # todo добавить учет денег системы
 
