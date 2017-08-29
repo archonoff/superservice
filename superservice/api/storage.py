@@ -29,7 +29,7 @@ async def create_user(pool_users, name, user_type, login, password_hash) -> dict
         raise exceptions.WrongUserType
     async with pool_users.acquire() as conn:
         async with conn.cursor() as cursor:
-            # Следующая строчка может выкинуть IntegrityError
+            # Следующая строчка может выкинуть IntegrityError, если пользователь с таким именем уже существует
             await cursor.execute('INSERT INTO users (name, type, login, password) VALUES (%s, %s, %s, %s);', (name, user_type, login, password_hash))
 
             return {
@@ -131,7 +131,7 @@ async def fulfill_order(pool_orders, pool_users, pool_redis_locks, order_id, exe
                     order = await cursor_orders.fetchone()
 
                     # Проверка,что заказ еще не закрыт
-                    fulfilled = order.get('fulfill')
+                    fulfilled = order.get('fulfilled')
                     if fulfilled:
                         raise exceptions.OrderAlreadyClosed()
 
@@ -205,6 +205,7 @@ async def fulfill_order(pool_orders, pool_users, pool_redis_locks, order_id, exe
 
                     # Заказ отмечается как исполненный
                     await cursor_orders.execute('UPDATE orders SET fulfilled="1", executor_id=%s WHERE id=%s;', (executor_id, order_id))
+                    order['fulfilled'] = 1
 
                     # todo добавить учет денег системы
 
@@ -213,3 +214,19 @@ async def fulfill_order(pool_orders, pool_users, pool_redis_locks, order_id, exe
                         await redis.delete('order:fulfill:{}'.format(order_id))
                         await redis.delete('user:fulfill:{}'.format(max(customer_id, executor_id)))
                         await redis.delete('user:fulfill:{}'.format(min(customer_id, executor_id)))
+
+                    return order
+
+
+async def get_user(pool_users, user_id):
+    if pool_users is None:
+        raise exceptions.MySQLConnectionNotFound()
+    async with pool_users.acquire() as conn:
+        async with conn.cursor() as cursor:
+            await cursor.execute('SELECT * FROM users WHERE id=%s;', (user_id, ))
+            user = await cursor.fetchone()
+
+            if user is None:
+                raise HTTPNotFound
+
+            return user

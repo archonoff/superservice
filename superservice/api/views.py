@@ -13,7 +13,7 @@ from aiohttp.web import Response
 from aiohttp_session import get_session
 
 from .. import settings
-from .storage import check_user, create_user, get_open_orders, get_users, create_order, find_order, fulfill_order
+from .storage import check_user, create_user, get_open_orders, get_users, create_order, find_order, fulfill_order, get_user
 from ..utils import success_response, error_response, login_required, save_user_to_session
 from .. import exceptions
 
@@ -176,11 +176,11 @@ async def update_order(request) -> Response:
         return error_response('Неверное значение id пользователя')
 
     try:
-        order = fulfill_order(request.app.get('pool_orders'),
-                              request.app.get('pool_users'),
-                              request.app.get('pool_redis_locks'),
-                              order_id,
-                              executor_id)
+        order = await fulfill_order(request.app.get('pool_orders'),
+                                    request.app.get('pool_users'),
+                                    request.app.get('pool_redis_locks'),
+                                    order_id,
+                                    executor_id)
     except exceptions.MySQLConnectionNotFound:
         return error_response('Не удалось подключение к базе данных')
     except exceptions.RedisConnectionNotFound:
@@ -197,3 +197,17 @@ async def update_order(request) -> Response:
         return error_response('У заказчика недостаточно денег для закрытия заказа')
 
     return success_response(order)
+
+
+@login_required()
+async def users_me(request):
+    session = await get_session(request)
+
+    user_id = session.get('user_id')
+
+    try:
+        user = await get_user(request.app.get('pool_users'), user_id)
+    except exceptions.MySQLConnectionNotFound:
+        return error_response('Не удалось подключение к базе данных')
+
+    return success_response(user)

@@ -70,6 +70,7 @@ app.router.add_get(r'/api/orders/{order_id:\d+}/', views.get_order)
 app.router.add_put(r'/api/orders/{order_id:\d+}/fulfill/', views.update_order)
 
 app.router.add_get('/api/users/', views.users_list)
+app.router.add_get('/api/users/me/', views.users_me)
 app.router.add_post('/api/users/register/', views.register_user)
 app.router.add_post('/api/users/login/', views.login_user)
 app.router.add_get('/api/users/logout/', views.logout_user)
