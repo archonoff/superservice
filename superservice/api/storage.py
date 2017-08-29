@@ -134,6 +134,9 @@ async def fulfill_order(pool_orders, pool_users, pool_redis_locks, order_id, exe
                     # Проверка,что заказ еще не закрыт
                     fulfilled = order.get('fulfilled')
                     if fulfilled:
+                        # Снять лок с заказа
+                        async with pool_redis_locks.get() as redis:
+                            await redis.delete('order:fulfill:{}'.format(order_id))
                         raise exceptions.OrderAlreadyClosed()
 
                     customer_id = int(order.get('customer_id'))
