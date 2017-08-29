@@ -24,3 +24,19 @@ class DBConsistencyError(Exception):
 
 class OrderValueTooSmall(Exception):
     pass
+
+
+class OrderAlreadyClosed(Exception):
+    pass
+
+
+class OrderProcessed(Exception):
+    pass
+
+
+class OrderCannotBeFulfilled(Exception):
+    pass
+
+
+class NotEnoughMoney(Exception):
+    pass

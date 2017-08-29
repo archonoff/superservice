@@ -1,20 +1,21 @@
+import asyncio
+
 from aiohttp.web import HTTPNotFound
 
 from .. import settings
-from ..exceptions import MySQLConnectionNotFound, WrongUserType, WrongLoginOrPassword, DBConsistencyError, \
-    RedisConnectionNotFound, OrderValueTooSmall
+from .. import exceptions
 
 
 # Функции работы с БД
 
 async def get_users(pool_users, users_type=None) -> list:
     if pool_users is None:
-        raise MySQLConnectionNotFound()
+        raise exceptions.MySQLConnectionNotFound()
     async with pool_users.acquire() as conn:
         async with conn.cursor() as cursor:
             if users_type:
                 if users_type not in ('executor', 'customer'):
-                    raise WrongUserType
+                    raise exceptions.WrongUserType
                 await cursor.execute('SELECT * FROM users WHERE type=%s;', (users_type, ))
             else:
                 await cursor.execute('SELECT * FROM users;')
@@ -23,9 +24,9 @@ async def get_users(pool_users, users_type=None) -> list:
 
 async def create_user(pool_users, name, user_type, login, password_hash) -> dict:
     if pool_users is None:
-        raise MySQLConnectionNotFound()
+        raise exceptions.MySQLConnectionNotFound()
     if user_type not in ('executor', 'customer'):
-        raise WrongUserType
+        raise exceptions.WrongUserType
     async with pool_users.acquire() as conn:
         async with conn.cursor() as cursor:
             # Следующая строчка может выкинуть IntegrityError
@@ -41,23 +42,23 @@ async def create_user(pool_users, name, user_type, login, password_hash) -> dict
 
 async def check_user(pool_users, login, password_hash) -> dict:
     if pool_users is None:
-        raise MySQLConnectionNotFound()
+        raise exceptions.MySQLConnectionNotFound()
     async with pool_users.acquire() as conn:
         async with conn.cursor() as cursor:
             await cursor.execute('SELECT * FROM users WHERE login=%s and password=%s', (login, password_hash))
             users: list = await cursor.fetchall()
             users_len = len(users)
             if users_len == 0:
-                raise WrongLoginOrPassword
+                raise exceptions.WrongLoginOrPassword
             elif users_len >= 2:
-                raise DBConsistencyError
+                raise exceptions.DBConsistencyError
             else:
                 return users[0]
 
 
 async def get_open_orders(pool_orders) -> list:
     if pool_orders is None:
-        raise MySQLConnectionNotFound()
+        raise exceptions.MySQLConnectionNotFound()
     async with pool_orders.acquire() as conn:
         async with conn.cursor() as cursor:
             await cursor.execute('SELECT * FROM orders WHERE fulfilled=0;')
@@ -67,10 +68,9 @@ async def get_open_orders(pool_orders) -> list:
 
 async def create_order(pool_orders, title, value, customer_id) -> dict:
     if pool_orders is None:
-        raise MySQLConnectionNotFound()
-    # todo округлять value до сотых долей в ближайшую сторону
-    if float(value) < settings.ORDER_MIN_VALUE:
-        raise OrderValueTooSmall
+        raise exceptions.MySQLConnectionNotFound()
+    if round(float(value), 2) < settings.ORDER_MIN_VALUE:
+        raise exceptions.OrderValueTooSmall
     async with pool_orders.acquire() as conn:
         async with conn.cursor() as cursor:
             await cursor.execute('INSERT INTO orders (title, value, customer_id) VALUES (%s, %s, %s);', (title, value, customer_id))
@@ -87,7 +87,7 @@ async def create_order(pool_orders, title, value, customer_id) -> dict:
 
 async def find_order(pool_orders, order_id) -> dict:
     if pool_orders is None:
-        raise MySQLConnectionNotFound()
+        raise exceptions.MySQLConnectionNotFound()
     async with pool_orders.acquire() as conn:
         async with conn.cursor() as cursor:
             await cursor.execute('SELECT * FROM orders WHERE id=%s;', (order_id, ))
@@ -97,3 +97,119 @@ async def find_order(pool_orders, order_id) -> dict:
                 raise HTTPNotFound
 
             return order
+
+
+async def fulfill_order(pool_orders, pool_users, pool_redis_locks, order_id, executor_id):
+    if pool_orders is None:
+        raise exceptions.MySQLConnectionNotFound()
+    if pool_users is None:
+        raise exceptions.MySQLConnectionNotFound()
+    if pool_redis_locks is None:
+        raise exceptions.RedisConnectionNotFound()
+
+    async with pool_orders.acquire() as conn_orders:
+        async with pool_users.acquire() as conn_users:
+            async with conn_orders.cursor() as cursor_orders:
+                async with conn_users.cursor() as cursor_users:
+
+                    # Лок на заказ
+                    for lock_attempt in range(settings.LOCK_ATTEMPTS_COUNT):
+                        async with pool_redis_locks.get() as redis:
+                            setnx_order_result = await redis.setnx('order:fulfill:{}'.format(order_id), 'lock')
+
+                        if setnx_order_result:
+                            # Если успешно установлен лок на заказ
+                            break
+
+                        await asyncio.sleep(settings.LOCK_ATTEMPTS_TIMEOUT)
+                    else:
+                        # После всех попыток лок так и не получилось поставить
+                        raise exceptions.OrderProcessed()
+
+                    # Информация о заказе
+                    await cursor_orders.execute('SELECT * FROM orders WHERE id=%s', (order_id, ))
+                    order = await cursor_orders.fetchone()
+
+                    # Проверка,что заказ еще не закрыт
+                    fulfilled = order.get('fulfill')
+                    if fulfilled:
+                        raise exceptions.OrderAlreadyClosed()
+
+                    customer_id = int(order.get('customer_id'))
+                    order_value = float(order.get('value'))
+
+                    # Комиссия системы, округление до сотых
+                    commission_value = round(order_value * settings.SYSTEM_COMMISSION, 2)
+
+                    # Пробуем сначала повесить лок на юзера с б́ольшим id
+                    for lock_attempt in range(settings.LOCK_ATTEMPTS_COUNT):
+                        async with pool_redis_locks.get() as redis:
+                            setnx_1_result = await redis.setnx('user:fulfill:{}'.format(max(customer_id, executor_id)), 'lock')
+
+                        if setnx_1_result:
+                            break
+
+                        await asyncio.sleep(settings.LOCK_ATTEMPTS_TIMEOUT)
+                    else:
+                        # Невозможноть закрытия заказа
+                        # Снять лок с заказа
+                        async with pool_redis_locks.get() as redis:
+                            await redis.delete('order:fulfill:{}'.format(order_id))
+                        raise exceptions.OrderCannotBeFulfilled()
+
+                    # Теперь лок на юзера с меньшим id
+                    for lock_attempt in range(settings.LOCK_ATTEMPTS_COUNT):
+                        async with pool_redis_locks.get() as redis:
+                            setnx_2_result = await redis.setnx('user:fulfill:{}'.format(min(customer_id, executor_id)), 'lock')
+
+                        if setnx_2_result:
+                            break
+
+                        await asyncio.sleep(settings.LOCK_ATTEMPTS_TIMEOUT)
+                    else:
+                        # Невозможноть закрытия заказа
+                        # Снять лок с заказа и с первого юзера
+                        async with pool_redis_locks.get() as redis:
+                            await redis.delete('order:fulfill:{}'.format(order_id))
+                            await redis.delete('user:fulfill:{}'.format(max(customer_id, executor_id)))
+                        raise exceptions.OrderCannotBeFulfilled()
+
+                    # Теперь лок стоит на заказе и обоих пользователях, можно переводить деньги
+
+                    # Информация о заказчике
+                    await cursor_users.execute('SELECT * FROM users WHERE id=%s', (customer_id, ))
+                    customer = await cursor_users.fetchone()
+                    customer_wallet = float(customer.get('wallet'))
+
+                    if order_value > customer_wallet:
+                        # У заказчика недостаточно денег
+                        # Снять лок с заказа и с обоих юзеров
+                        async with pool_redis_locks.get() as redis:
+                            await redis.delete('order:fulfill:{}'.format(order_id))
+                            await redis.delete('user:fulfill:{}'.format(max(customer_id, executor_id)))
+                            await redis.delete('user:fulfill:{}'.format(min(customer_id, executor_id)))
+                        raise exceptions.NotEnoughMoney()
+
+                    # Информация об исполнителе
+                    await cursor_users.execute('SELECT * FROM users WHERE id=%s', (executor_id, ))
+                    executor = await cursor_users.fetchone()
+                    executor_wallet = executor.get('wallet')
+
+                    # todo убедить в отсутствии ошибок округления при операциях с деньгами
+
+                    # Уменьшение денег у заказчика
+                    await cursor_users.execute('UPDATE users SET wallet=%s WHERE id=%s', (customer_wallet - order_value, customer_id))
+
+                    # Увеличение денег у исполнителя
+                    await cursor_users.execute('UPDATE users SET wallet=%s WHERE id=%s', (executor_wallet + order_value - commission_value, executor_id))
+
+                    # Заказ отмечается как исполненный
+                    await cursor_orders.execute('UPDATE orders SET fulfilled="1", executor_id=%s WHERE id=%s;', (executor_id, order_id))
+
+                    # todo добавить учет денег системы
+
+                    # Снять лок с заказа и с обоих юзеров
+                    async with pool_redis_locks.get() as redis:
+                        await redis.delete('order:fulfill:{}'.format(order_id))
+                        await redis.delete('user:fulfill:{}'.format(max(customer_id, executor_id)))
+                        await redis.delete('user:fulfill:{}'.format(min(customer_id, executor_id)))

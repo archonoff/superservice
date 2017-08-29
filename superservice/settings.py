@@ -8,6 +8,9 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SYSTEM_COMMISSION = 0.1     # Минимальная комиссия - 1%
 ORDER_MIN_VALUE = 1         # Минимальаня сумма заказа - 1 (рубль)
 
+LOCK_ATTEMPTS_COUNT = 10        # Колисчество попыток повесить лок
+LOCK_ATTEMPTS_TIMEOUT = 0.5     # Задержка между попытками обращения
+
 
 # Хранилища
 
