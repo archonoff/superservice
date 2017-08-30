@@ -11,14 +11,6 @@ from . import settings
 from .api import views
 
 
-# Настройка приложения
-
-# try:
-#     import uvloop
-#     asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())     # fixme на маке стало хуже        # todo не нужно, если запускать гуникорном
-# except:
-#     pass
-
 loop = asyncio.get_event_loop()
 
 shared_mysql_settings = {
@@ -54,6 +46,7 @@ pool_redis_locks = loop.run_until_complete(aioredis.create_pool((settings.REDIS_
                                                                 minsize=5,
                                                                 maxsize=50))
 
+# todo запись сессий в редис
 pool_redis_sessions = loop.run_until_complete(aioredis.create_pool((settings.REDIS_HOST, settings.REDIS_PORT),
                                                                    db=1,
                                                                    loop=loop,
@@ -73,7 +66,7 @@ app.router.add_get('/api/users/', views.users_list)
 app.router.add_get('/api/users/me/', views.users_me)
 app.router.add_post('/api/users/register/', views.register_user)
 app.router.add_post('/api/users/login/', views.login_user)
-app.router.add_get('/api/users/logout/', views.logout_user)
+app.router.add_post('/api/users/logout/', views.logout_user)
 
 setup_session(app, SimpleCookieStorage(cookie_name='SUPERSERVICE_SESSION'))
 

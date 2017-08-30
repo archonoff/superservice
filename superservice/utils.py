@@ -42,7 +42,7 @@ def save_user_to_session(session, user: dict):
     session['user_id'] = user.get('id')
     session['name'] = user.get('name')
     session['login'] = user.get('login')
-    session['user_type'] = user.get('user_type')
+    session['user_type'] = user.get('type')
 
 
 def code_response(status: str, code: int):

@@ -19,7 +19,7 @@ async def get_users(pool_users, users_type=None) -> list:
                 await cursor.execute('SELECT * FROM users WHERE type=%s;', (users_type, ))
             else:
                 await cursor.execute('SELECT * FROM users;')
-            return await cursor.fetchall()     # todo возможно fetchall не лучший вариант
+            return await cursor.fetchall()     # todo плохо для большого объема данных
 
 
 async def create_user(pool_users, name, user_type, login, password_hash) -> dict:
@@ -35,7 +35,7 @@ async def create_user(pool_users, name, user_type, login, password_hash) -> dict
             return {
                 'id': cursor.lastrowid,
                 'name': name,
-                'user_type': user_type,
+                'type': user_type,
                 'login': login,
             }
 
@@ -62,7 +62,7 @@ async def get_open_orders(pool_orders) -> list:
     async with pool_orders.acquire() as conn:
         async with conn.cursor() as cursor:
             await cursor.execute('SELECT * FROM orders WHERE fulfilled=0;')
-            open_orders = await cursor.fetchall()     # todo возможно fetchall - не лучший вариант
+            open_orders = await cursor.fetchall()     # todo плохо для большого объема данных
     return open_orders
 
 
@@ -131,7 +131,7 @@ async def fulfill_order(pool_orders, pool_users, pool_redis_locks, order_id, exe
                     await cursor_orders.execute('SELECT * FROM orders WHERE id=%s', (order_id, ))
                     order = await cursor_orders.fetchone()
 
-                    # Проверка,что заказ еще не закрыт
+                    # Проверка, что заказ еще не закрыт
                     fulfilled = order.get('fulfilled')
                     if fulfilled:
                         # Снять лок с заказа
@@ -144,6 +144,7 @@ async def fulfill_order(pool_orders, pool_users, pool_redis_locks, order_id, exe
 
                     # Комиссия системы, округление до сотых
                     commission_value = round(order_value * settings.SYSTEM_COMMISSION, 2)
+                    # todo запилить подсчет денег системы
 
                     # Пробуем сначала повесить лок на юзера с б́ольшим id
                     for lock_attempt in range(settings.LOCK_ATTEMPTS_COUNT):
