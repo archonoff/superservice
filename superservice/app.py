@@ -23,7 +23,7 @@ shared_mysql_settings = {
 }
 
 # todo предусмотреть переключение на слейва при недоступности мастера
-# Путы подключения к мусклу
+# Пулы подключения к мусклу
 # Если таблицы находятся на разных серверах - указать соответсвующие настройки
 # Для таблицы orders
 pool_orders = loop.run_until_complete(aiomysql.create_pool(host=settings.MYSQL_HOST,
