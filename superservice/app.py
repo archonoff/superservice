@@ -25,6 +25,7 @@ shared_mysql_settings = {
 # todo предусмотреть переключение на слейва при недоступности мастера
 # Путы подключения к мусклу
 # Если таблицы находятся на разных серверах - указать соответсвующие настройки
+# Для таблицы orders
 pool_orders = loop.run_until_complete(aiomysql.create_pool(host=settings.MYSQL_HOST,
                                                            port=settings.MYSQL_PORT,
                                                            user=settings.MYSQL_USER,
@@ -32,6 +33,7 @@ pool_orders = loop.run_until_complete(aiomysql.create_pool(host=settings.MYSQL_H
                                                            db=settings.MYSQL_DB,
                                                            **shared_mysql_settings))
 
+# Для таблицы users
 pool_users = loop.run_until_complete(aiomysql.create_pool(host=settings.MYSQL_HOST,
                                                           port=settings.MYSQL_PORT,
                                                           user=settings.MYSQL_USER,
@@ -53,7 +55,6 @@ pool_redis_sessions = loop.run_until_complete(aioredis.create_pool((settings.RED
                                                                    maxsize=50))
 
 # todo запилить логгирование (ошибки + действия пользователй)
-# todo хочу автоматический закрывающий слеш
 app = web.Application(loop=loop)
 app.router.add_get('/', views.index)
 app.router.add_get('/api/orders/', views.orders_list)

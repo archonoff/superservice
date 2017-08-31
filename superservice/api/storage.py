@@ -145,6 +145,7 @@ async def fulfill_order(pool_orders, pool_users, pool_redis_locks, order_id, exe
 
                     # Комиссия системы, округление до сотых
                     commission_value = round(order_value * settings.SYSTEM_COMMISSION, 2)
+
                     # todo запилить подсчет денег системы
 
                     # Пробуем сначала повесить лок на юзера с б́ольшим id
@@ -203,8 +204,6 @@ async def fulfill_order(pool_orders, pool_users, pool_redis_locks, order_id, exe
                     executor = await cursor_users.fetchone()
                     executor_wallet = executor.get('wallet')
 
-                    # todo убедить в отсутствии ошибок округления при операциях с деньгами
-
                     # Уменьшение денег у заказчика
                     await cursor_users.execute('UPDATE users SET wallet=%s WHERE id=%s', (customer_wallet - order_value, customer_id))
 
@@ -215,8 +214,6 @@ async def fulfill_order(pool_orders, pool_users, pool_redis_locks, order_id, exe
                     await cursor_orders.execute('UPDATE orders SET fulfilled="1", executor_id=%s WHERE id=%s;', (executor_id, order_id))
                     order['fulfilled'] = 1
                     order['executor_id'] = executor_id
-
-                    # todo добавить учет денег системы
 
                     # Снять лок с заказа и с обоих юзеров
                     async with pool_redis_locks.get() as redis:
