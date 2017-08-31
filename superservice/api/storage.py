@@ -69,7 +69,8 @@ async def get_open_orders(pool_orders) -> list:
 async def create_order(pool_orders, title, value, customer_id) -> dict:
     if pool_orders is None:
         raise exceptions.MySQLConnectionNotFound()
-    if round(float(value), 2) < settings.ORDER_MIN_VALUE:
+    value = round(float(value), 2)
+    if value < settings.ORDER_MIN_VALUE:
         raise exceptions.OrderValueTooSmall
     async with pool_orders.acquire() as conn:
         async with conn.cursor() as cursor:
