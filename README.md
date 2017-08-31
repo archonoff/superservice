@@ -44,6 +44,7 @@ URL: /api/users/me/
 URL: /api/users/register/
 Метод: POST
 Доступ: кто угодно
+Тело запроса (json):
 {
     name - имя и фамилия
     user_type - тип пользователя: "customer" (заказчик) или "executor" (исполнитель)
@@ -56,6 +57,7 @@ URL: /api/users/register/
 URL: /api/users/login/
 Метод: POST
 Доступ: кто угодно
+Тело запроса (json):
 {
     login - имя пользователя
     password - пароль
@@ -94,14 +96,14 @@ URL: /api/orders/<id>/fulfill/
 URL: /api/orders/add/
 Метод: POST
 Доступ: только заказчики
-Тело запроса:
+Тело запроса (json):
 {
     title - название заказа
     value - сумма заказа
 }
 ```
 
-#### Ответ
+#### Ответ (json)
 ```
 {
     result - результат запроса: "success" или "error"
