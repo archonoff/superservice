@@ -16,9 +16,9 @@ async def get_users(pool_users, users_type=None) -> list:
             if users_type:
                 if users_type not in ('executor', 'customer'):
                     raise exceptions.WrongUserType
-                await cursor.execute('SELECT * FROM users WHERE type=%s;', (users_type, ))
+                await cursor.execute('SELECT id, name, type FROM users WHERE type=%s;', (users_type, ))
             else:
-                await cursor.execute('SELECT * FROM users;')
+                await cursor.execute('SELECT id, name, type FROM users;')
             return await cursor.fetchall()     # todo плохо для большого объема данных
 
 
@@ -229,7 +229,7 @@ async def get_user(pool_users, user_id):
         raise exceptions.MySQLConnectionNotFound()
     async with pool_users.acquire() as conn:
         async with conn.cursor() as cursor:
-            await cursor.execute('SELECT * FROM users WHERE id=%s;', (user_id, ))
+            await cursor.execute('SELECT id, name, type, wallet FROM users WHERE id=%s;', (user_id, ))
             user = await cursor.fetchone()
 
             if user is None:
