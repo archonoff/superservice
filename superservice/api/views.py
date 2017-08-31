@@ -102,7 +102,7 @@ async def register_user(request) -> Response:
 @login_required()
 async def orders_list(request) -> Response:
     try:
-        open_orders = await get_open_orders(request.app.get('pool_orders'))
+        open_orders = await get_open_orders(request.app.get('pool_orders'), request.app.get('pool_users'))
     except exceptions.MySQLConnectionNotFound:
         return error_response('Не удалось подключение к базе данных')
     return success_response(open_orders)

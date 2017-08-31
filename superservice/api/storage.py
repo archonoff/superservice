@@ -56,13 +56,23 @@ async def check_user(pool_users, login, password_hash) -> dict:
                 return users[0]
 
 
-async def get_open_orders(pool_orders) -> list:
+async def get_open_orders(pool_orders, pool_users) -> list:
     if pool_orders is None:
         raise exceptions.MySQLConnectionNotFound()
-    async with pool_orders.acquire() as conn:
-        async with conn.cursor() as cursor:
-            await cursor.execute('SELECT * FROM orders WHERE fulfilled=0;')
-            open_orders = await cursor.fetchall()     # todo плохо для большого объема данных
+    if pool_users is None:
+        raise exceptions.MySQLConnectionNotFound()
+    async with pool_orders.acquire() as conn_orders:
+        async with conn_orders.cursor() as cursor_orders:
+            async with pool_users.acquire() as conn_users:
+                async with conn_users.cursor() as cursor_users:
+                    await cursor_orders.execute('SELECT id, title, value, customer_id FROM orders WHERE fulfilled=0;')
+                    open_orders = await cursor_orders.fetchall()     # todo плохо для большого объема данных
+                    await cursor_users.execute('SELECT id, name FROM users;')
+                    users = await cursor_users.fetchall()
+                    users = {user.get('id'): user.get('name') for user in users}     # удобный вид для джоина
+                    for order in open_orders:
+                        order.update({'customer_name': users.get(order.get('customer_id'))})    # джоин
+
     return open_orders
 
 
