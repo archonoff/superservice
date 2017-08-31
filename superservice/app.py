@@ -4,7 +4,7 @@ import aioredis
 
 from aiohttp import web
 
-from aiohttp_session import SimpleCookieStorage
+from aiohttp_session.redis_storage import RedisStorage
 from aiohttp_session import setup as setup_session
 
 from . import settings
@@ -46,7 +46,6 @@ pool_redis_locks = loop.run_until_complete(aioredis.create_pool((settings.REDIS_
                                                                 minsize=5,
                                                                 maxsize=50))
 
-# todo запись сессий в редис
 pool_redis_sessions = loop.run_until_complete(aioredis.create_pool((settings.REDIS_HOST, settings.REDIS_PORT),
                                                                    db=1,
                                                                    loop=loop,
@@ -68,10 +67,9 @@ app.router.add_post('/api/users/register/', views.register_user)
 app.router.add_post('/api/users/login/', views.login_user)
 app.router.add_post('/api/users/logout/', views.logout_user)
 
-setup_session(app, SimpleCookieStorage(cookie_name='SUPERSERVICE_SESSION'))
+setup_session(app, RedisStorage(redis_pool=pool_redis_sessions, cookie_name='SUPERSERVICE_SESSION'))
 
 app['pool_users'] = pool_users
 app['pool_orders'] = pool_orders
 
 app['pool_redis_locks'] = pool_redis_locks
-app['pool_redis_sessions'] = pool_redis_sessions
