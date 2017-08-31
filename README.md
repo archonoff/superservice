@@ -1,5 +1,8 @@
 ### Установка зависимостей
-`pip install -r requirements.txt`
+```
+# Необходим Python 3.6
+$ pip install -r requirements.txt
+```
 
 ### Запуск сервера
 ```
