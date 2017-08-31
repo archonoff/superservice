@@ -1,0 +1,9 @@
+aiohttp
+aiohttp-session
+aiomysql
+aioredis
+gunicorn
+hiredis
+requests
+ujson
+uvloop
