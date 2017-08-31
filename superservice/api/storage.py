@@ -24,7 +24,7 @@ async def create_user(pool_users, name, user_type, login, password_hash) -> dict
     if pool_users is None:
         raise exceptions.MySQLConnectionNotFound()
     if user_type not in ('executor', 'customer'):
-        raise exceptions.WrongUserType
+        raise exceptions.WrongUserType()
     async with pool_users.acquire() as conn:
         async with conn.cursor() as cursor:
             # Следующая строчка может выкинуть IntegrityError, если пользователь с таким именем уже существует
@@ -78,9 +78,12 @@ async def get_open_orders(pool_orders, pool_users) -> list:
 async def create_order(pool_orders, title, value, customer_id) -> dict:
     if pool_orders is None:
         raise exceptions.MySQLConnectionNotFound()
-    value = round(float(value), 2)
+
+    value = float(value)
     if value < settings.ORDER_MIN_VALUE:
-        raise exceptions.OrderValueTooSmall
+        raise exceptions.OrderValueTooSmall()
+    value = round(value, 2)
+
     async with pool_orders.acquire() as conn:
         async with conn.cursor() as cursor:
             await cursor.execute('INSERT INTO orders (title, value, customer_id) VALUES (%s, %s, %s);', (title, value, customer_id))
@@ -185,7 +188,7 @@ async def fulfill_order(pool_orders, pool_users, pool_redis_locks, order_id, exe
 
                         await asyncio.sleep(settings.LOCK_ATTEMPTS_TIMEOUT)
                     else:
-                        # Невозможноть закрытия заказа
+                        # Невозможность закрытия заказа
                         # Снять лок с заказа и с первого юзера
                         async with pool_redis_locks.get() as redis:
                             await redis.delete('order:fulfill:{}'.format(order_id))
@@ -213,11 +216,23 @@ async def fulfill_order(pool_orders, pool_users, pool_redis_locks, order_id, exe
                     executor = await cursor_users.fetchone()
                     executor_wallet = executor.get('wallet')
 
+                    new_customer_wallet_value = round(customer_wallet - order_value, 2)
+                    new_executor_wallet_value = round(executor_wallet + order_value - commission_value, 2)
+
+                    if new_executor_wallet_value > settings.WALLET_MAX_VALUE:
+                        # Если после исполнения заказа сумма станет слишком велика
+                        # Снять лок с заказа и с обоих юзеров
+                        async with pool_redis_locks.get() as redis:
+                            await redis.delete('order:fulfill:{}'.format(order_id))
+                            await redis.delete('user:fulfill:{}'.format(max(customer_id, executor_id)))
+                            await redis.delete('user:fulfill:{}'.format(min(customer_id, executor_id)))
+                        raise exceptions.WalletValueTooBig()
+
                     # Уменьшение денег у заказчика
-                    await cursor_users.execute('UPDATE users SET wallet=%s WHERE id=%s', (customer_wallet - order_value, customer_id))
+                    await cursor_users.execute('UPDATE users SET wallet=%s WHERE id=%s', (new_customer_wallet_value, customer_id))
 
                     # Увеличение денег у исполнителя
-                    await cursor_users.execute('UPDATE users SET wallet=%s WHERE id=%s', (executor_wallet + order_value - commission_value, executor_id))
+                    await cursor_users.execute('UPDATE users SET wallet=%s WHERE id=%s', (new_executor_wallet_value, executor_id))
 
                     # Заказ отмечается как исполненный
                     await cursor_orders.execute('UPDATE orders SET fulfilled="1", executor_id=%s WHERE id=%s;', (executor_id, order_id))
@@ -245,3 +260,53 @@ async def get_user(pool_users, user_id):
                 raise HTTPNotFound
 
             return user
+
+
+async def add_to_wallet(pool_users, pool_redis_locks, user_id, value):
+    if pool_users is None:
+        raise exceptions.MySQLConnectionNotFound()
+    if pool_redis_locks is None:
+        raise exceptions.RedisConnectionNotFound()
+
+    value = float(value)
+    if value < settings.WALLET_MIN_FILLUP:
+        raise ValueError()
+    value = round(value, 2)
+
+    async with pool_users.acquire() as conn:
+        async with conn.cursor() as cursor:
+            # Лок на юзера
+            for lock_attempt in range(settings.LOCK_ATTEMPTS_COUNT):
+                async with pool_redis_locks.get() as redis:
+                    setnx_result = await redis.setnx('user:fulfill:{}'.format(user_id), 'lock')
+
+                if setnx_result:
+                    # Лок установлен
+                    await redis.expire('user:fulfill:{}'.format(user_id), settings.LOCK_EXPIRE_TIMEOUT)
+                    break
+
+                await asyncio.sleep(settings.LOCK_ATTEMPTS_TIMEOUT)
+            else:
+                # Невозможноть пополнить кошелек
+                raise exceptions.WalletCannotBeFilledUp()
+
+            # Информация о заказчике
+            await cursor.execute('SELECT * FROM users WHERE id=%s', (user_id, ))
+            customer = await cursor.fetchone()
+            customer_wallet = float(customer.get('wallet'))
+
+            new_value = round(customer_wallet + value, 2)
+
+            if new_value > settings.WALLET_MAX_VALUE:
+                # Если после пополнения сумма станет слишком велика
+                # Снять лок с юзера
+                async with pool_redis_locks.get() as redis:
+                    await redis.delete('user:fulfill:{}'.format(user_id))
+                raise exceptions.WalletValueTooBig()
+
+            # Увеличение денег у заказчика
+            await cursor.execute('UPDATE users SET wallet=%s WHERE id=%s', (new_value, user_id))
+
+            # Снять лок с юзера
+            async with pool_redis_locks.get() as redis:
+                await redis.delete('user:fulfill:{}'.format(user_id))

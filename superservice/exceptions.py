@@ -40,3 +40,11 @@ class OrderCannotBeFulfilled(Exception):
 
 class NotEnoughMoney(Exception):
     pass
+
+
+class WalletCannotBeFilledUp(Exception):
+    pass
+
+
+class WalletValueTooBig(Exception):
+    pass

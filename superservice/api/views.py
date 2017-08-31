@@ -13,7 +13,7 @@ from aiohttp.web import Response
 from aiohttp_session import get_session
 
 from .. import settings
-from .storage import check_user, create_user, get_open_orders, get_users, create_order, find_order, fulfill_order, get_user
+from .storage import check_user, create_user, get_open_orders, get_users, create_order, find_order, fulfill_order, get_user, add_to_wallet
 from ..utils import success_response, error_response, login_required, save_user_to_session
 from .. import exceptions
 
@@ -193,6 +193,8 @@ async def update_order(request) -> Response:
         return error_response('Ошибка входных данных')
     except exceptions.NotEnoughMoney:
         return error_response('У заказчика недостаточно денег для закрытия заказа')
+    except exceptions.WalletValueTooBig:
+        return error_response('После выполнения заказа сумма на кошельке станет слишком велика. Заказ не может быть выполнен')
 
     return success_response(order)
 
@@ -209,3 +211,36 @@ async def users_me(request):
         return error_response('Не удалось подключение к базе данных')
 
     return success_response(user)
+
+
+@login_required('customer')
+async def fillup_wallet(request) -> Response:
+    session = await get_session(request)
+    user_id = session.get('user_id')
+
+    try:
+        data = await request.json(loads=json_lib.loads)
+    except ValueError:
+        return error_response('Ошибка входных данных')
+
+    try:
+        value = data['value']
+    except KeyError:
+        return error_response('Недостаточно входных данных')
+    except AttributeError:
+        return error_response('Ошибка входных данных')
+
+    try:
+        await add_to_wallet(request.app.get('pool_users'), request.app.get('pool_redis_locks'), user_id, value)
+    except exceptions.MySQLConnectionNotFound:
+        return error_response('Не удалось подключение к базе данных')
+    except exceptions.RedisConnectionNotFound:
+        return error_response('Не удалось подключение к зранилищу ключ-значение')
+    except exceptions.WalletCannotBeFilledUp:
+        return error_response('Кошелек не может быть пополнен')
+    except exceptions.WalletValueTooBig:
+        return error_response('После пополнения сумма станет слишком велика. Кошелек не может быть пополнен')
+    except (DataError, IntegrityError, TypeError, ValueError):
+        return error_response('Ошибка входых данных')
+
+    return success_response('Кошелек успешно пополнен')
