@@ -12,6 +12,8 @@ LOCK_ATTEMPTS_COUNT = 10        # Колисчество попыток пове
 LOCK_ATTEMPTS_TIMEOUT = 0.5     # Задержка между попытками обращения
 LOCK_EXPIRE_TIMEOUT = 120       # todo рискованная затея
 
+SESSION_DURATION = 86400        # Продолжительность сессии, в секундах
+
 
 # Хранилища
 

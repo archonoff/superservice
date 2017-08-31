@@ -68,7 +68,9 @@ app.router.add_post('/api/users/register/', views.register_user)
 app.router.add_post('/api/users/login/', views.login_user)
 app.router.add_post('/api/users/logout/', views.logout_user)
 
-setup_session(app, RedisStorage(redis_pool=pool_redis_sessions, cookie_name='SUPERSERVICE_SESSION'))
+setup_session(app, RedisStorage(redis_pool=pool_redis_sessions,
+                                cookie_name='SUPERSERVICE_SESSION',
+                                max_age=settings.SESSION_DURATION))
 
 app['pool_users'] = pool_users
 app['pool_orders'] = pool_orders

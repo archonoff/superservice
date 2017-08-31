@@ -64,7 +64,6 @@ async def login_user(request) -> Response:
 
 
 async def register_user(request) -> Response:
-    # todo не пускать пользователя, если он залогинен
     try:
         data = await request.json(loads=json_lib.loads)
     except ValueError:
@@ -85,7 +84,6 @@ async def register_user(request) -> Response:
         user = await create_user(request.app.get('pool_users'), name, user_type, login, password_hash)
     except exceptions.MySQLConnectionNotFound:
         return error_response('Не удалось подключение к базе данных')
-        # todo возможно тут переключаться на слейв
     except exceptions.WrongUserType:
         return error_response('Неверно указан user_type')
     except (exceptions.UsernameAlreadyExists, IntegrityError):
