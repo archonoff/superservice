@@ -6,8 +6,6 @@ from .. import settings
 from .. import exceptions
 
 
-# Функции работы с БД
-
 async def get_users(pool_users, users_type=None) -> list:
     if pool_users is None:
         raise exceptions.MySQLConnectionNotFound()
@@ -65,6 +63,7 @@ async def get_open_orders(pool_orders, pool_users) -> list:
         async with conn_orders.cursor() as cursor_orders:
             async with pool_users.acquire() as conn_users:
                 async with conn_users.cursor() as cursor_users:
+                    # todo можно не выводить заказ, если на нем стоит лок
                     await cursor_orders.execute('SELECT id, title, value, customer_id FROM orders WHERE fulfilled=0;')
                     open_orders = await cursor_orders.fetchall()     # todo плохо для большого объема данных
                     await cursor_users.execute('SELECT id, name FROM users;')
