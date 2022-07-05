@@ -4,20 +4,43 @@
 #
 #    pip-compile --output-file requirements.txt requirements.in
 #
-aiohttp-session==1.0.0
 aiohttp==2.2.5
+    # via
+    #   -r requirements.in
+    #   aiohttp-session
+aiohttp-session==1.0.0
+    # via -r requirements.in
 aiomysql==0.0.9
+    # via -r requirements.in
 aioredis==0.3.3
-async-timeout==1.3.0      # via aiohttp
-certifi==2017.7.27.1      # via requests
-chardet==3.0.4            # via aiohttp, requests
+    # via -r requirements.in
+async-timeout==1.3.0
+    # via aiohttp
+certifi==2017.7.27.1
+    # via requests
+chardet==3.0.4
+    # via
+    #   aiohttp
+    #   requests
 gunicorn==19.7.1
-hiredis==0.2.0            # via aioredis
-idna==2.6                 # via requests
-multidict==3.1.3          # via aiohttp, yarl
-pymysql==0.7.11           # via aiomysql
+    # via -r requirements.in
+hiredis==0.2.0
+    # via aioredis
+idna==2.6
+    # via requests
+multidict==3.1.3
+    # via
+    #   aiohttp
+    #   yarl
+pymysql==0.7.11
+    # via aiomysql
 requests==2.18.4
-ujson==1.35
-urllib3==1.22             # via requests
+    # via -r requirements.in
+ujson==5.4.0
+    # via -r requirements.in
+urllib3==1.22
+    # via requests
 uvloop==0.8.0
-yarl==0.12.0              # via aiohttp
+    # via -r requirements.in
+yarl==0.12.0
+    # via aiohttp
